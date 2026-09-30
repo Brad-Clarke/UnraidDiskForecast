@@ -9,7 +9,8 @@ declare(strict_types=1);
  *
  * Then open http://localhost:8080/ (the Forecast page, /Tools/DiskForecast). Settings are at
  * /Settings/DiskForecastSettings and the dashboard tile at /Dashboard. Add ?theme=white,
- * black, azure or gray to switch Unraid theme; /reset rebuilds the fake data.
+ * black, azure or gray to switch Unraid theme; ?date= and ?number= set Unraid's date and number
+ * formats (for example ?date=%A,%20%m/%d/%Y&number=,.); /reset rebuilds the fake data.
  */
 
 require __DIR__ . '/bootstrap.php';
@@ -68,18 +69,19 @@ if ($path === '/favicon.ico') {
 $themes = ['white', 'black', 'azure', 'gray'];
 $theme = in_array($_GET['theme'] ?? '', $themes, true) ? $_GET['theme'] : ($_COOKIE['df_theme'] ?? 'black');
 setcookie('df_theme', $theme, ['path' => '/']);
-PreviewComposition::create($dataRoot);
+$previewApp = PreviewComposition::create($dataRoot);
 
 /**
- * Runs a .page file's body the way Unraid does, with the globals its pages see.
+ * Runs a .page file's body the way Unraid does, with the globals its pages see. Pages that
+ * build the plugin's objects get the preview's (fake server) composition as $dfApp.
  *
  * @param array<string, mixed> $mytiles
  */
-function renderPage(string $file, string $theme, string $pluginRoot, array &$mytiles = []): string
+function renderPage(string $file, string $theme, string $pluginRoot, DiskForecast\Composition $dfApp, array &$mytiles = []): string
 {
     $text = str_replace("\r\n", "\n", (string) file_get_contents($file));
     $body = substr($text, strpos($text, "\n---\n") + 5);
-    $display = ['theme' => $theme];
+    $display = ['theme' => $theme, 'date' => $_GET['date'] ?? '%c', 'number' => $_GET['number'] ?? '.,'];
     $var = ['csrf_token' => 'PREVIEW-TOKEN'];
     $docroot = dirname($pluginRoot, 2);
     ob_start();
@@ -104,14 +106,16 @@ $themeLinks = implode(' ', array_map(
 if ($path === '/Dashboard') {
     $heading = 'Dashboard';
     $mytiles = [];
-    renderPage("{$pluginRoot}/DiskForecastDashboard.page", $theme, $pluginRoot, $mytiles);
-    $content = '<table class="dash-tile">' . $mytiles['diskforecast']['column2'] . '</table>';
+    renderPage("{$pluginRoot}/DiskForecastDashboard.page", $theme, $pluginRoot, $previewApp, $mytiles);
+    $content = isset($mytiles['diskforecast'])
+        ? '<table class="dash-tile">' . $mytiles['diskforecast']['column2'] . '</table>'
+        : '<p><em>No Disk Forecast tile: no target is set to show on the dashboard.</em></p>';
 } elseif ($path === '/Settings/DiskForecastSettings') {
     $heading = 'Settings › User Utilities › Disk Forecast';
-    $content = renderPage("{$pluginRoot}/DiskForecastSettings.page", $theme, $pluginRoot);
+    $content = renderPage("{$pluginRoot}/DiskForecastSettings.page", $theme, $pluginRoot, $previewApp);
 } else {
     $heading = 'Tools › Disk Utilities › Disk Forecast';
-    $content = renderPage("{$pluginRoot}/DiskForecast.page", $theme, $pluginRoot);
+    $content = renderPage("{$pluginRoot}/DiskForecast.page", $theme, $pluginRoot, $previewApp);
 }
 ?>
 <!DOCTYPE html>

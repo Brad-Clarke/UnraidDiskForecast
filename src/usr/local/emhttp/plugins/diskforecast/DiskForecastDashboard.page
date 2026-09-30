@@ -2,15 +2,23 @@ Menu="Dashboard:0"
 Markdown="false"
 ---
 <?php
-$dfRoot = ($docroot ?? '/usr/local/emhttp') . '/plugins/diskforecast/assets/';
-$dfAsset = static fn (string $file): string => "/plugins/diskforecast/assets/{$file}?v=" . (int) @filemtime($dfRoot . $file);
-$dfTheme = in_array($display['theme'] ?? '', ['black', 'gray'], true) ? 'dark' : 'light';
-$dfCss = $dfAsset('diskforecast.css');
-$dfCommon = $dfAsset('common.js');
-$dfScript = $dfAsset('dashboard.js');
+require_once ($docroot ?? '/usr/local/emhttp') . '/plugins/diskforecast/include/bootstrap.php';
 
-$pluginname = 'diskforecast';
-$mytiles[$pluginname]['column2'] = <<<EOT
+$dfApp ??= DiskForecast\Composition::production();
+$dfShown = array_filter($dfApp->settings()->targets, static fn (DiskForecast\Config\Target $t): bool => $t->onDashboard);
+
+if ($dfShown !== []) {
+    $dfRoot = ($docroot ?? '/usr/local/emhttp') . '/plugins/diskforecast/assets/';
+    $dfAsset = static fn (string $file): string => "/plugins/diskforecast/assets/{$file}?v=" . (int) @filemtime($dfRoot . $file);
+    $dfTheme = in_array($display['theme'] ?? '', ['black', 'gray'], true) ? 'dark' : 'light';
+    $dfDate = htmlspecialchars($display['date'] ?? '%c', ENT_QUOTES);
+    $dfNumber = htmlspecialchars($display['number'] ?? '.,', ENT_QUOTES);
+    $dfCss = $dfAsset('diskforecast.css');
+    $dfCommon = $dfAsset('common.js');
+    $dfScript = $dfAsset('dashboard.js');
+
+    $pluginname = 'diskforecast';
+    $mytiles[$pluginname]['column2'] = <<<EOT
 <tbody id="db-diskforecast" title="Disk Forecast">
 <tr><td>
 <i class="fa fa-area-chart f32"></i><div class="section">Disk Forecast<br><span id="df-dash-sub">Loading…</span><br></div>
@@ -18,10 +26,11 @@ $mytiles[$pluginname]['column2'] = <<<EOT
 </td></tr>
 <tr><td>
 <link rel="stylesheet" href="{$dfCss}">
-<div id="df-dash" class="df-root df-dash" data-theme="{$dfTheme}" data-api="/plugins/diskforecast/api.php" data-link="/Tools/DiskForecast"></div>
+<div id="df-dash" class="df-root df-dash" data-theme="{$dfTheme}" data-date-format="{$dfDate}" data-number-format="{$dfNumber}" data-api="/plugins/diskforecast/api.php" data-link="/Tools/DiskForecast"></div>
 <script src="{$dfCommon}"></script>
 <script src="{$dfScript}"></script>
 </td></tr>
 </tbody>
 EOT;
+}
 ?>

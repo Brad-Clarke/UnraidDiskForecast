@@ -19,6 +19,23 @@ final class Target
     public const WARNINGS = [0, 14, 30, 60, 90, 180, 365];
 
     /**
+     * Baseline for a new target: a reading every hour (about 440 KB of history a year), a
+     * 180-day trend (the backtest's best window), and a warning 90 days before full, which
+     * leaves time to buy, ship and preclear a drive.
+     */
+    public const BASELINE = ['intervalMinutes' => 60, 'windowDays' => 180, 'warnDays' => 90];
+
+    /**
+     * A target with the baseline settings, shown on the dashboard.
+     *
+     * @param list<string> $members
+     */
+    public static function withBaseline(string $id, string $name, TargetType $type, array $members): self
+    {
+        return new self($id, $name, $type, $members, self::BASELINE['intervalMinutes'], self::BASELINE['windowDays'], self::BASELINE['warnDays']);
+    }
+
+    /**
      * @param string $id Stable identifier; names the history file, never changes after creation.
      * @param string $name Name shown to the user.
      * @param TargetType $type What is measured.
@@ -26,6 +43,7 @@ final class Target
      * @param int $intervalMinutes Minutes between readings.
      * @param int $windowDays Days of history the trend is fitted to; 0 for all of it.
      * @param int $warnDays Notify when the estimate falls within this many days; 0 for never.
+     * @param bool $onDashboard Whether the target is shown on the dashboard tile.
      */
     public function __construct(
         public readonly string $id,
@@ -35,6 +53,7 @@ final class Target
         public readonly int $intervalMinutes,
         public readonly int $windowDays,
         public readonly int $warnDays,
+        public readonly bool $onDashboard = true,
     ) {
     }
 
@@ -59,6 +78,7 @@ final class Target
             'intervalMinutes' => $this->intervalMinutes,
             'windowDays' => $this->windowDays,
             'warnDays' => $this->warnDays,
+            'onDashboard' => $this->onDashboard,
         ];
     }
 
@@ -87,6 +107,16 @@ final class Target
             (int) ($data['intervalMinutes'] ?? 60),
             (int) ($data['windowDays'] ?? 180),
             (int) ($data['warnDays'] ?? 0),
+            self::flag($data['onDashboard'] ?? true),
         );
+    }
+
+    /**
+     * A yes/no value from JSON (true/false) or the settings file ("yes"/"no"); anything
+     * missing or unrecognised counts as yes.
+     */
+    private static function flag(mixed $value): bool
+    {
+        return !in_array(is_string($value) ? strtolower($value) : $value, [false, 'no', 'false', '0', 0], true);
     }
 }

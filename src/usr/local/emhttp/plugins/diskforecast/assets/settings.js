@@ -11,6 +11,7 @@
   ];
 
   function SettingsView(root) {
+    DF.configure(root);
     this.root = root;
     this.api = root.getAttribute('data-api');
     this.csrf = root.getAttribute('data-csrf') || window.csrf_token || '';
@@ -84,9 +85,10 @@
               name: '',
               type: 'disks',
               members: [],
-              intervalMinutes: 60,
-              windowDays: 180,
-              warnDays: 0
+              intervalMinutes: self.options.baseline.intervalMinutes,
+              windowDays: self.options.baseline.windowDays,
+              warnDays: self.options.baseline.warnDays,
+              onDashboard: true
             });
             self.render();
             var names = self.root.querySelectorAll('.df-target input[type="text"]');
@@ -167,7 +169,7 @@
         el('span', {}, [
           DF.icon('exclamation-triangle'), ' ',
           el('strong', { text: 'Remove ' + (target.name || 'this target') + '? ' }),
-          'Its ' + recorded.readings.toLocaleString() + ' readings since ' + DF.formatDate(recorded.firstReading) + ' will be deleted when you press Apply. This can\'t be undone.'
+          'Its ' + DF.formatNumber(recorded.readings, 0) + ' readings since ' + DF.formatDate(recorded.firstReading) + ' will be deleted when you press Apply. This can\'t be undone.'
         ]),
         el('span', { className: 'df-actions' }, [
           el('button', {
@@ -184,7 +186,17 @@
     }
 
     return el('div', { className: 'df-target-foot' }, [
-      el('span', { className: 'df-faint', text: target.id ? '' : 'New: readings start after you press Apply.' }),
+      el('span', { className: 'df-target-options' }, [
+        el('label', { className: 'df-check' }, [
+          el('input', {
+            type: 'checkbox',
+            checked: target.onDashboard !== false,
+            onchange: function (event) { target.onDashboard = event.target.checked; }
+          }),
+          'Show on the dashboard'
+        ]),
+        target.id ? null : el('span', { className: 'df-faint', text: 'New: readings start after you press Apply.' })
+      ]),
       el('button', {
         type: 'button',
         className: 'df-button is-quiet',

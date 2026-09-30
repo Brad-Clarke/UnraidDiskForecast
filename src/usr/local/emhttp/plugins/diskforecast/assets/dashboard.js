@@ -7,8 +7,9 @@
 
   function render(root, subtitle, data) {
     var link = root.getAttribute('data-link');
-    var warnings = data.targets.filter(function (t) { return t.warning || t.status === 'full'; }).length;
-    var soonest = data.targets.filter(function (t) { return t.secondsToFull !== null; })
+    var shown = data.targets.filter(function (t) { return t.onDashboard; });
+    var warnings = shown.filter(function (t) { return t.warning || t.status === 'full'; }).length;
+    var soonest = shown.filter(function (t) { return t.secondsToFull !== null; })
       .sort(function (a, b) { return a.secondsToFull - b.secondsToFull; })[0];
 
     if (subtitle) {
@@ -17,12 +18,7 @@
         : (soonest ? 'Next full: ' + soonest.name + ' in ' + DF.formatDuration(soonest.secondsToFull) : 'Nothing filling up');
     }
 
-    if (!data.targets.length) {
-      root.replaceChildren(el('a', { href: link, className: 'df-faint', text: 'Nothing tracked yet. Choose what to track.' }));
-      return;
-    }
-
-    root.replaceChildren.apply(root, data.targets.map(function (target) {
+    root.replaceChildren.apply(root, shown.map(function (target) {
       return DF.targetRow(target, { tag: 'a', href: link + '?target=' + encodeURIComponent(target.id) });
     }));
   }
@@ -32,6 +28,7 @@
     if (!root) {
       return;
     }
+    DF.configure(root);
     var subtitle = document.getElementById('df-dash-sub');
     DF.getJson(root.getAttribute('data-api'), { action: 'overview' }).then(function (data) {
       render(root, subtitle, data);

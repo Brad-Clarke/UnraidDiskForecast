@@ -122,6 +122,7 @@ final class Api
                 'intervals' => Target::INTERVALS,
                 'windows' => Target::WINDOWS,
                 'warnings' => Target::WARNINGS,
+                'baseline' => Target::BASELINE,
             ],
         ]];
     }

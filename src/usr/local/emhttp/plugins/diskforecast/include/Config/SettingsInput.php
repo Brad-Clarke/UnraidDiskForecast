@@ -108,7 +108,9 @@ final class SettingsInput
             $id = self::newId($name, $current, $usedIds);
         }
 
-        return [new Target($id, $name, $type, $type === TargetType::Array ? [] : $members, $interval, $window, $warn), []];
+        $onDashboard = ($raw['onDashboard'] ?? true) !== false;
+
+        return [new Target($id, $name, $type, $type === TargetType::Array ? [] : $members, $interval, $window, $warn, $onDashboard), []];
     }
 
     /**

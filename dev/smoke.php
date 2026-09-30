@@ -35,17 +35,43 @@ $logger = new ConsoleLogger();
 $notifier = new ConsoleNotifier();
 $store = PreviewData::settingsStore($root, $logger);
 $check($store->load() === null, 'with only default.cfg, the plugin is on automatic targets');
+$fresh = (new Composition(new FakePlatform(), $store, $root, "{$root}/runtime", $logger, $notifier))->settings()->toArray()['targets'];
+$baseline = ['intervalMinutes' => 60, 'windowDays' => 180, 'warnDays' => 90, 'onDashboard' => true];
+$check($fresh === [
+    ['id' => 'array', 'name' => 'Array', 'type' => 'array', 'members' => []] + $baseline,
+    ['id' => 'pool-cache', 'name' => 'Cache', 'type' => 'disks', 'members' => ['cache']] + $baseline,
+    ['id' => 'pool-nvme', 'name' => 'Nvme', 'type' => 'disks', 'members' => ['nvme']] + $baseline,
+], 'a fresh install tracks the array and each pool: hourly, 180-day trend, warning at 90 days, on the dashboard');
 $saved = new Settings([
     new Target('array', 'Array', TargetType::Array, [], 60, 180, 3650),
     new Target('media', 'Media', TargetType::Share, ['Media'], 15, 30, 0),
-    new Target('fast', 'Fast "pools"', TargetType::Disks, ['cache', 'nvme'], 30, 0, 90),
+    new Target('fast', 'Fast "pools"', TargetType::Disks, ['cache', 'nvme'], 30, 0, 90, false),
 ]);
 $store->save($saved);
 $loaded = $store->load();
 $expected = $saved->toArray();
 $expected['targets'][2]['name'] = 'Fast pools';
 $check($loaded !== null && $loaded->toArray() === $expected, 'settings round-trip through diskforecast.cfg (quotes dropped from names)');
-$check(str_contains((string) file_get_contents("{$root}/diskforecast.cfg"), 'TARGET_3_MEMBERS="cache,nvme"'), 'the file is plain key="value" lines');
+$cfgText = (string) file_get_contents("{$root}/diskforecast.cfg");
+$check(str_contains($cfgText, 'TARGET_3_MEMBERS="cache,nvme"') && str_contains($cfgText, 'TARGET_3_DASHBOARD="no"'), 'the file is plain key="value" lines, including the dashboard choice');
+file_put_contents("{$root}/diskforecast.cfg", str_replace('TARGET_1_DASHBOARD="yes"' . "\n", '', $cfgText));
+$check($store->load()?->targets[0]->onDashboard === true, 'a target saved without the dashboard choice is shown on the dashboard');
+
+$dashboardTile = static function (Composition $dfApp): bool {
+    $mytiles = [];
+    $docroot = dirname(__DIR__) . '/src/usr/local/emhttp';
+    $display = ['theme' => 'black'];
+    $page = str_replace("\r\n", "\n", (string) file_get_contents("{$docroot}/plugins/diskforecast/DiskForecastDashboard.page"));
+    ob_start();
+    eval('?>' . substr($page, strpos($page, "\n---\n") + 5));
+    ob_end_clean();
+
+    return isset($mytiles['diskforecast']['column2']);
+};
+$tileApp = static fn (): Composition => new Composition(new FakePlatform(), $store, $root, "{$root}/runtime", $logger, $notifier);
+$check($dashboardTile($tileApp()), 'the dashboard tile is rendered while any target is shown');
+$store->save(new Settings([new Target('fast', 'Fast', TargetType::Disks, ['cache'], 30, 0, 0, false)]));
+$check(!$dashboardTile($tileApp()), 'the dashboard tile is left out when every target is hidden');
 $store->save(new Settings(array_slice($saved->targets, 0, 2)));
 $app = new Composition(new FakePlatform(), $store, $root, "{$root}/runtime", $logger, $notifier);
 

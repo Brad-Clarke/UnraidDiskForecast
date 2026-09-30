@@ -25,6 +25,7 @@ final class WarningMonitor
         private readonly Notifier $notifier,
         private readonly string $statePath,
         private readonly Logger $logger,
+        private readonly Format $format,
     ) {
     }
 
@@ -77,19 +78,19 @@ final class WarningMonitor
     private function send(Target $target, Forecast $forecast): void
     {
         $latest = $forecast->latest;
-        $space = $latest === null ? '' : ' ' . Format::bytes($latest->free) . ' free of ' . Format::bytes($latest->size) . '.';
+        $space = $latest === null ? '' : ' ' . $this->format->bytes($latest->free) . ' free of ' . $this->format->bytes($latest->size) . '.';
         if ($forecast->status === ForecastStatus::Full) {
             $this->notifier->notify("{$target->name} is full", "{$target->name} has no free space left.{$space}", 'alert');
 
             return;
         }
 
-        $when = Format::duration((float) $forecast->secondsToFull);
-        $date = Format::date($forecast->time + (int) $forecast->secondsToFull);
+        $when = $this->format->duration((float) $forecast->secondsToFull);
+        $date = $this->format->date($forecast->time + (int) $forecast->secondsToFull);
         $range = '';
         if ($forecast->earliestSeconds !== null) {
-            $earliest = Format::date($forecast->time + (int) $forecast->earliestSeconds);
-            $latest = $forecast->latestSeconds === null ? 'much later' : Format::date($forecast->time + (int) $forecast->latestSeconds);
+            $earliest = $this->format->date($forecast->time + (int) $forecast->earliestSeconds);
+            $latest = $forecast->latestSeconds === null ? 'much later' : $this->format->date($forecast->time + (int) $forecast->latestSeconds);
             $range = $earliest === $latest ? '' : " Likely between {$earliest} and {$latest}.";
         }
 

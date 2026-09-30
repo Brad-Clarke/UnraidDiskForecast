@@ -70,7 +70,32 @@
     });
   }
 
-  /** Decimal bytes, as Unraid shows them. */
+  /**
+   * Unraid's display formats: the date format from Settings > Date and Time (strftime, such as
+   * "%A, %e %B %Y", or "%c" for the system's own) and the number format from Settings >
+   * Display (the decimal mark, then the thousands separator if any, such as "," + ".").
+   */
+  var display = { date: '%c', decimal: '.', group: ',' };
+  var MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+  /** Takes Unraid's formats from a view's root element (data-date-format, data-number-format). */
+  function configure(root) {
+    var number = root.getAttribute('data-number-format');
+    display.date = root.getAttribute('data-date-format') || '%c';
+    if (number) {
+      display.decimal = number.charAt(0) || '.';
+      display.group = number.charAt(1);
+    }
+  }
+
+  /** A number with Unraid's decimal mark and thousands separator. */
+  function formatNumber(value, decimals) {
+    var parts = Math.abs(value).toFixed(decimals || 0).split('.');
+    var whole = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, display.group);
+    return (value < 0 ? '−' : '') + whole + (parts[1] ? display.decimal + parts[1] : '');
+  }
+
+  /** Decimal bytes, as Unraid shows them: "38.2 TB" (or "38,2 TB" with a decimal comma). */
   function formatBytes(bytes) {
     if (bytes === null || bytes === undefined || !isFinite(bytes)) {
       return '–';
@@ -79,10 +104,10 @@
     for (var i = 0; i < units.length; i++) {
       if (Math.abs(bytes) >= units[i][1]) {
         var value = bytes / units[i][1];
-        return (Math.abs(value) >= 100 ? value.toFixed(0) : value.toFixed(1)) + ' ' + units[i][0];
+        return formatNumber(value, Math.abs(value) >= 100 ? 0 : 1) + ' ' + units[i][0];
       }
     }
-    return Math.round(bytes) + ' B';
+    return formatNumber(bytes, 0) + ' B';
   }
 
   /** The two largest units of a duration: "2y 7mo", "3mo 12d", "5d 4h", "3h 20m". */
@@ -109,20 +134,53 @@
     return parts.length ? parts.join(' ') : 'under a minute';
   }
 
-  /** A date such as "14 Apr 2029" from Unix seconds. */
-  function formatDate(time) {
-    var date = new Date(time * 1000);
-    return date.getDate() + ' ' + MONTHS[date.getMonth()] + ' ' + date.getFullYear();
+  /** Unraid's date format without the leading weekday, or '' for the system's own ("%c"). */
+  function datePattern() {
+    var pattern = display.date.replace(/^%[Aa],?\s*/, '');
+    return pattern === '%c' || /%[^YmdeBb]/.test(pattern) ? '' : pattern;
   }
 
+  /**
+   * A date from Unix seconds in Unraid's format without the weekday: "12 July 2028",
+   * "July 12, 2028", "2028-07-12". The system format uses the browser's own style.
+   */
+  function formatDate(time) {
+    var date = new Date(time * 1000);
+    var pattern = datePattern();
+    if (!pattern) {
+      return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+    var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+    var tokens = {
+      Y: String(date.getFullYear()),
+      m: pad(date.getMonth() + 1),
+      d: pad(date.getDate()),
+      e: String(date.getDate()),
+      B: MONTH_NAMES[date.getMonth()],
+      b: MONTHS[date.getMonth()]
+    };
+    return pattern.replace(/%([YmdeBb])/g, function (match, token) { return tokens[token]; });
+  }
+
+  /** Whether Unraid's date format puts the month before the day. */
+  function monthFirst() {
+    var pattern = datePattern();
+    if (!pattern) {
+      return new Date(2000, 0, 31).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }).search(/31/) > 0;
+    }
+    return pattern.search(/%[mBb]/) < pattern.search(/%[de]/);
+  }
+
+  /** A month for graph axes: "Jul 2027". */
   function formatMonth(time) {
     var date = new Date(time * 1000);
     return MONTHS[date.getMonth()] + ' ' + date.getFullYear();
   }
 
+  /** A day for graph axes, in the order Unraid's date format uses: "12 Jul" or "Jul 12". */
   function formatShortDate(time) {
     var date = new Date(time * 1000);
-    return date.getDate() + ' ' + MONTHS[date.getMonth()];
+    return monthFirst() ? MONTHS[date.getMonth()] + ' ' + date.getDate() : date.getDate() + ' ' + MONTHS[date.getMonth()];
   }
 
   function formatRate(perMonth) {
@@ -287,6 +345,8 @@
     icon: icon,
     getJson: getJson,
     postForm: postForm,
+    configure: configure,
+    formatNumber: formatNumber,
     formatBytes: formatBytes,
     formatDuration: formatDuration,
     formatDate: formatDate,

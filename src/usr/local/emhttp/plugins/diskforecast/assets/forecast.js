@@ -8,6 +8,7 @@
   var DRIVE_SIZES = [8, 12, 16, 20, 24, 28];
 
   function ForecastView(root) {
+    DF.configure(root);
     this.root = root;
     this.api = root.getAttribute('data-api');
     this.settingsUrl = root.getAttribute('data-settings-url');
@@ -49,9 +50,9 @@
       children.push(el('div', { className: 'df-notice' }, [
         DF.icon('info-circle'),
         el('div', {}, [
-          'Tracking the array and each pool with the default settings. ',
-          el('a', { href: self.settingsUrl, text: 'Choose what to track' }),
-          ' to add disks or shares, change how often readings are taken, or get a warning before something fills.'
+          'Tracking the whole array and each pool with the default settings: a reading every hour, a trend over the last 180 days, and a warning 90 days before each fills. ',
+          el('a', { href: self.settingsUrl, text: 'Change these or add disks and shares' }),
+          '.'
         ])
       ]));
     }

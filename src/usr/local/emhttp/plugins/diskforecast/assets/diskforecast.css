@@ -372,6 +372,9 @@
 
 .df-target-members { margin-top: 12px; }
 .df-target-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 12px; }
+.df-target-options { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; }
+.df-check { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.df-check input { margin: 0; }
 
 .df-pills { display: flex; flex-wrap: wrap; gap: 6px; }
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Refuses a release unless: the version is YYYY.MM.DD[.N], no GitHub release exists for it,
-# CHANGELOG.md has a "## <version>" section, the support URL is a real forum thread, and
-# (in GitHub Actions) the repository matches plugin/plugin.conf. Optionally writes that
-# changelog section out as the release notes.
+# CHANGELOG.md has a "## <version>" section, the support URL is this repository's GitHub
+# issues or a forums.unraid.net topic, and (in GitHub Actions) the repository matches
+# plugin/plugin.conf. Optionally writes that changelog section out as the release notes.
 #
 # Usage: scripts/release-checks.sh --version <version> [--notes-out <file>]
 # PLUGIN_CONF and CHANGELOG override the files read, for scripts/test-release-checks.sh.
@@ -44,11 +44,13 @@ fi
 # 3. CHANGELOG.md has a section for it.
 grep -qxF "## $version" "$changelog" || refuse "$changelog has no '## $version' section"
 
-# 4. The support URL is a real forum thread, and the repository is the one releases go to.
+# 4. The support URL is real (this repository's issues or a forum topic), and the repository
+#    is the one releases go to.
 # shellcheck source=../plugin/plugin.conf
 . "$conf"
-if ! [[ "$SUPPORT_URL" =~ ^https://forums\.unraid\.net/topic/[^[:space:]]+$ ]]; then
-  refuse "SUPPORT_URL in $conf is '$SUPPORT_URL', not a forums.unraid.net/topic/ URL"
+if [ "$SUPPORT_URL" != "https://github.com/$REPOSITORY/issues" ] \
+    && ! [[ "$SUPPORT_URL" =~ ^https://forums\.unraid\.net/topic/[^[:space:]]+$ ]]; then
+  refuse "SUPPORT_URL in $conf is '$SUPPORT_URL', not https://github.com/$REPOSITORY/issues or a forums.unraid.net/topic/ URL"
 fi
 if [ -n "${GITHUB_REPOSITORY:-}" ] && [ "$GITHUB_REPOSITORY" != "$REPOSITORY" ]; then
   refuse "running in $GITHUB_REPOSITORY but REPOSITORY in $conf is $REPOSITORY; pluginURL would point elsewhere"

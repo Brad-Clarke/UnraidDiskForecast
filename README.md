@@ -1,25 +1,32 @@
 # Disk Forecast for Unraid
 
-Tracks how fast your array, disks, pools or shares fill up and projects when each one will
-run out of space, with an estimate, a likely range and the expected growth, so you can budget
-for new drives before you need them.
+See when your array, disks, pools or shares will run out of space, so you can budget for new
+drives before you need them.
 
-![Disk Forecast](docs/screenshot.png)
+![The Forecast page](docs/screenshot.png)
 
-- **Tools › Disk Forecast:** every target with its time to full, a graph of usage and
-  forecast (30 days to all history), a projected-usage table, and a "What if I add a drive"
-  card that shows the new full date and draws the new capacity on the graph.
-- **Settings › Disk Forecast:** track the whole array, any mix of disks and pools, or a
-  share, each with its own reading interval (15 minutes to 1 day), trend window (7 days to
-  all history) and warning threshold.
-- **Dashboard tile:** every target's time to full at a glance.
-- **Warnings** through Unraid notifications when a target is due to fill within your window.
+## What you get
 
-It only reads free-space figures the filesystem already keeps: no folder is scanned and no
-disk is woken. Readings are kept in the plugin's folder on the flash drive
-(`/boot/config/plugins/diskforecast/history`), saved from RAM once a day and when the array
-stops, so the USB stick sees one small write per target per day.
-How the forecast works and why it was chosen: [docs/decisions.md](docs/decisions.md).
+- **Tools › Disk Forecast.** Every target with how full it is, when it's expected to be full,
+  a likely range and its expected growth. Pick one to see a graph of its usage and forecast
+  (30 days to all history) and a projected-usage table.
+- **What if I add a drive?** Pick a drive size (or type one) and see how much longer the
+  selected target would last. The new capacity is drawn on the graph.
+- **Settings › Disk Forecast.** Choose what to track: the whole array, any mix of disks and
+  pools, or a share. Each gets its own reading interval (15 minutes to 1 day), how much
+  history the trend uses (7 days to all of it), an optional warning, and whether it shows
+  on the dashboard.
+- **A dashboard tile** with each chosen target's time to full. Hide every target from the
+  dashboard and the tile isn't shown at all.
+- **Warnings** through Unraid's notifications when something is due to fill within the
+  window you choose.
+- **Dates and numbers follow your Unraid settings**: the date format under Settings › Date
+  and Time, and the number format under Settings › Display.
+
+<p>
+  <img src="docs/screenshot-settings.png" alt="Settings" width="68%">
+  <img src="docs/screenshot-dashboard.png" alt="Dashboard tile" width="28%">
+</p>
 
 ## Install
 
@@ -29,39 +36,55 @@ In Unraid, go to **Plugins › Install Plugin** and paste:
 https://github.com/Brad-Clarke/UnraidDiskForecast/releases/latest/download/diskforecast.plg
 ```
 
-Requires Unraid 7.0 or later. Updates arrive through Unraid's plugin manager and keep your
-settings and readings. Removing the plugin deletes both.
+Requires Unraid 7.0 or later. Out of the box it tracks the whole array and each pool
+separately, taking a reading every hour, basing the trend on the last 180 days, and warning
+you 90 days before one fills. Change that, or add disks and shares, under
+**Settings › Disk Forecast**. Updates arrive through Unraid's plugin manager and
+keep your settings and readings. Removing the plugin deletes both.
 
-**Support:** the Disk Forecast thread on the Unraid forums (link to follow).
+## How the forecast works
 
-## Development
+- **Readings.** At each interval the plugin notes how much space each target has used. The
+  first forecast appears after 7 days of readings.
+- **The trend.** It fits a trend through the history you chose (180 days by default). The
+  fit leans on the typical day, so a one-off big copy or clean-out doesn't swing it.
+- **Checking itself.** Once there's enough history (the trend window plus a month), the
+  plugin replays its own past: at many earlier points it forecasts as if that were today,
+  and compares with what actually happened. If your usage has tended to speed up or slow
+  down, the estimate is adjusted for that.
+- **The likely range** is how far those past forecasts were off: the full date usually
+  lands inside it, but it isn't a promise. A sudden import or a change in habits can't be
+  seen coming. Until the plugin can check itself, the row says *Rough estimate*.
+- **Expected growth** is the free space divided by the time to full, so the numbers on a row
+  always agree.
+- **Not filling** means usage is flat or shrinking over the trend window, so there's no
+  date to show.
+- **What if I add a drive** keeps the same expected growth and adds the new space.
 
-Needs bash, GNU tar, xz, PHP 8.1+ and Python 3. `shellcheck` and `xmllint` for the checks.
+The full reasoning, with accuracy figures, is in [docs/decisions.md](docs/decisions.md).
 
-```sh
-scripts/build.sh --version 2026.09.30   # build/diskforecast-<version>-noarch-1.txz and build/diskforecast.plg
-scripts/ci-checks.sh                    # XML, shellcheck, php -l, package audit, MD5
-scripts/test-install-scripts.sh         # install/remove scripts are idempotent and offline
-scripts/test-release-checks.sh          # the release gate refuses what it should
-php -S 127.0.0.1:8765 dev/preview.php   # the real pages against a fake server
-php dev/smoke.php                       # cron run, warnings, settings file and Unraid parsing
-php -d memory_limit=1G dev/backtest.php # forecast accuracy against fake histories
-```
+## What it reads and writes
 
-Layout: `src/` is the package root and mirrors the Unraid filesystem; `plugin/` holds the
-manifest template, `plugin.conf` (repository, support URL, minimum Unraid version) and the
-Community Apps icon; `dev/` and `tests/` are never installed.
+**Reads**
+- Unraid's list of disks, pools and share settings.
+- The free-space figures each mounted filesystem already keeps.
+- It never looks inside your folders, so it never wakes a sleeping disk.
 
-## Releasing
+**Writes**
+- Its settings, `/boot/config/plugins/diskforecast/diskforecast.cfg`, only when you press
+  Apply.
+- Its readings, one small file per target in `/boot/config/plugins/diskforecast/history/`.
+  New readings wait in memory and are saved to the flash drive once a day and when the array
+  stops, so the USB stick gets one small write per target per day. An unclean shutdown loses
+  at most a day of readings.
+- A note of which warnings it has sent, only when one is sent or cleared.
 
-1. Add a `## <version>` section to `CHANGELOG.md` (version `YYYY.MM.DD`, or `YYYY.MM.DD.N`
-   for a second release that day). Never reuse a version.
-2. Tag and push: `git tag v<version> && git push origin v<version>`.
-   The release workflow checks the tag, the changelog and the support URL, builds, runs every
-   check, publishes the `.plg` and `.txz` to a GitHub release, and confirms the install URL
-   serves the new version.
-3. For a beta or a rehearsal, run the **Release** workflow by hand: tick *prerelease* for a
-   beta (stable users are not offered it), or leave *dry run* ticked to check everything and
-   publish nothing.
+It sends nothing over the network.
 
-Licence: GPLv2 ([LICENSE](LICENSE)). Chart.js (MIT) is bundled in `assets/`.
+## Support
+
+Questions, bugs and ideas: [GitHub issues](https://github.com/Brad-Clarke/UnraidDiskForecast/issues).
+
+Building, testing and releasing: [CONTRIBUTING.md](CONTRIBUTING.md).
+
+Licence: GPLv2 ([LICENSE](LICENSE)). Chart.js (MIT) is bundled.

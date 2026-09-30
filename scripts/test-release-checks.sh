@@ -24,10 +24,12 @@ chmod +x "$tmp/bin/gh"
 
 cat > "$tmp/good.conf" <<'CONF'
 REPOSITORY="example/plugin"
-SUPPORT_URL="https://forums.unraid.net/topic/123456-plugin-example/"
+SUPPORT_URL="https://github.com/example/plugin/issues"
 MIN_VERSION="7.0.0"
 CONF
+sed 's|^SUPPORT_URL=.*|SUPPORT_URL="https://forums.unraid.net/topic/123456-plugin-example/"|' "$tmp/good.conf" > "$tmp/forum.conf"
 sed 's|^SUPPORT_URL=.*|SUPPORT_URL="@SUPPORT_URL@"|' "$tmp/good.conf" > "$tmp/placeholder.conf"
+sed 's|^SUPPORT_URL=.*|SUPPORT_URL="https://github.com/someone/else/issues"|' "$tmp/good.conf" > "$tmp/other-issues.conf"
 printf '# Changelog\n\n## 2026.02.01\n\n- Something new.\n\n## 2026.01.01\n\n- First release.\n' > "$tmp/CHANGELOG.md"
 
 failures=0
@@ -54,11 +56,13 @@ expect() {
 }
 
 expect pass   "may be released"        "a good release passes"            PLUGIN_CONF="$tmp/good.conf" -- 2026.02.01
+expect pass   "may be released"        "a forum topic as support passes"  PLUGIN_CONF="$tmp/forum.conf" -- 2026.02.01
 expect refuse "not YYYY.MM.DD"         "a badly formed tag is refused"    PLUGIN_CONF="$tmp/good.conf" -- 2026.2.1
 expect refuse "not a real date"        "an impossible date is refused"    PLUGIN_CONF="$tmp/good.conf" -- 2026.13.01
 expect refuse "already exists"         "a duplicate version is refused"   PLUGIN_CONF="$tmp/good.conf" -- 2026.01.01
 expect refuse "no '## 2026.03.01'"     "a missing changelog section is refused" PLUGIN_CONF="$tmp/good.conf" -- 2026.03.01
-expect refuse "not a forums.unraid.net" "a placeholder support URL is refused" PLUGIN_CONF="$tmp/placeholder.conf" -- 2026.02.01
+expect refuse "is '@SUPPORT_URL@'"     "a placeholder support URL is refused" PLUGIN_CONF="$tmp/placeholder.conf" -- 2026.02.01
+expect refuse "someone/else/issues"    "another repository's issues are refused" PLUGIN_CONF="$tmp/other-issues.conf" -- 2026.02.01
 expect refuse "pluginURL would point"  "a repository mismatch is refused" PLUGIN_CONF="$tmp/good.conf" GITHUB_REPOSITORY="someone/else" -- 2026.02.01
 
 env PATH="$tmp/bin:$PATH" CHANGELOG="$tmp/CHANGELOG.md" GITHUB_REPOSITORY="example/plugin" PLUGIN_CONF="$tmp/good.conf" \

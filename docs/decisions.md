@@ -27,8 +27,11 @@ while measuring a share meant scanning its folders, and nothing is scanned any m
   `key="value"` file over the packaged `default.cfg`, read with `parse_plugin_cfg` where
   Unraid provides it. Targets are numbered keys (`TARGETS="2"`, `TARGET_1_NAME="Array"`,
   ...); names may not contain `"`. Written only when the user presses Apply. While
-  `AUTO_TARGETS="yes"` (the default) the plugin tracks the whole array plus each pool, hourly,
-  180-day window, no warnings, so readings start at install.
+  `AUTO_TARGETS="yes"` (the default) the plugin tracks the whole array and each pool as its
+  own target (named after the pool), all with the baseline (`Target::BASELINE`, 2026-10-01):
+  a reading every hour, a 180-day trend, a warning 90 days before full (time to buy, ship and
+  preclear a drive), shown on the dashboard. Readings start at install. New targets added in
+  Settings start from the same baseline.
 - **Readings (2026-10-01):** one CSV per target (`time,size,used,free`, about 50 bytes a
   reading) in `/boot/config/plugins/diskforecast/history/` on the flash drive, the way plugins
   keep their data (Disk Location keeps its database in its flash folder). New readings are
@@ -58,6 +61,12 @@ Following Unraid's convention of viewing under Tools and configuring under Setti
   "never (∞)" and one without a forecast yet reads "N/A". `?target=<id>` preselects a target;
   the dashboard rows link that way.
 - **Settings:** Settings › User Utilities › Disk Forecast (`/Settings/DiskForecastSettings`).
+- **Dashboard (2026-10-01):** each target has "Show on the dashboard" (on by default, stored
+  as `TARGET_n_DASHBOARD`; a target saved without it counts as shown). The tile lists only
+  those targets, and the dashboard page leaves the tile out entirely when there are none,
+  so it reads the settings server-side. Because that runs inside Unraid's own page request,
+  the plugin's logger opens and closes the system log around each message instead of
+  calling `openlog` once, which would re-label the rest of the request's log lines.
 
 ## 2026-09-30: Packaging and releases follow the Unraid plugin brief
 
@@ -94,9 +103,28 @@ Following Unraid's convention of viewing under Tools and configuring under Setti
   - The pages keep the plugin's own styles (light and dark themes follow Unraid's theme)
     rather than stock webGui styling. Nothing is loaded from outside the plugin: Chart.js is
     bundled.
+  - Support is the repository's GitHub issues, not a forum thread (2026-10-01: the plugin
+    is for the owner first). Community Apps accepts it: its field reference describes
+    `<Support>` as "Support URL for forums, issues, or project help". The release gate
+    accepts this repository's issues page or a forums.unraid.net topic.
   - The reading history lives on the flash drive although the brief keeps flash for config
     and the cached package. It keeps the brief's aim (no steady writes wearing the stick)
     by batching: readings wait in RAM and are appended once a day and when the array stops.
+
+## 2026-10-01: Dates and numbers follow Unraid's display settings
+
+- **Date format** (Settings › Date and Time, `$display['date']`): one of Unraid's seven
+  strftime layouts, shown without the leading weekday to fit the rows ("12 July 2028",
+  "July 12, 2028", "07/12/2028", "2028-07-12"...). "System Setting" (`%c`) uses the
+  browser's own style on the pages and "12 Jul 2028" in notifications. Graph axes use month
+  names ("Jul 2027") and put the day before or after the month as the chosen format does.
+- **Number format** (Settings › Display, `$display['number']`): its decimal mark and
+  thousands separator are used for sizes and counts ("38,2 TB").
+- The pages pass both to the scripts as `data-date-format` and `data-number-format`;
+  notifications read them from `/boot/config/plugins/dynamix/dynamix.cfg` (`Format::fromUnraid`).
+  The 12/24-hour time format does not apply: the plugin shows durations, never clock times.
+- **Language** packs are not followed: the plugin's text is English only. Translating it
+  would mean marking every string and shipping translation files.
 
 ## 2026-09-28: Schedule
 

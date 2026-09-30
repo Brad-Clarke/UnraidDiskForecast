@@ -11,7 +11,7 @@ use DiskForecast\Logging\Logger;
  * (/boot/config/plugins/diskforecast/diskforecast.cfg) over the packaged default.cfg.
  *
  * Targets are stored as numbered keys (TARGETS="2", TARGET_1_NAME="Array", ...). While
- * AUTO_TARGETS is "yes" (the packaged default) the plugin tracks the array and each pool.
+ * AUTO_TARGETS is "yes" (the packaged default) the plugin tracks the whole array and each pool.
  * The file is only written when the user saves, so it can live on the flash drive.
  */
 final class SettingsStore
@@ -25,6 +25,7 @@ final class SettingsStore
         'INTERVAL' => 'intervalMinutes',
         'WINDOW' => 'windowDays',
         'WARN' => 'warnDays',
+        'DASHBOARD' => 'onDashboard',
     ];
 
     /**
@@ -88,6 +89,7 @@ final class SettingsStore
             $n = $index + 1;
             $values = $target->toArray();
             $values['members'] = implode(',', $target->members);
+            $values['onDashboard'] = $target->onDashboard ? 'yes' : 'no';
             foreach (self::FIELDS as $suffix => $field) {
                 $lines[] = "TARGET_{$n}_{$suffix}=\"" . str_replace('"', '', (string) $values[$field]) . '"';
             }

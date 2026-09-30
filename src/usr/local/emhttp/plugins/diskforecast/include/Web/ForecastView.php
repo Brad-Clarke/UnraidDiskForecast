@@ -46,6 +46,7 @@ final class ForecastView
             'intervalMinutes' => $target->intervalMinutes,
             'windowDays' => $target->windowDays,
             'warnDays' => $target->warnDays,
+            'onDashboard' => $target->onDashboard,
             'status' => $forecast->status->value,
             'calibrated' => $forecast->calibrated(),
             'warning' => WarningMonitor::isWarning($target, $forecast),

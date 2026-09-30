@@ -37,6 +37,7 @@ final class Composition
     /**
      * @param string $pluginDir The plugin's folder on the flash drive: saved readings and warning state.
      * @param string $runtimeDir The plugin's folder in RAM: pending readings, forecast cache, lock.
+     * @param Format $format Date and number format for notifications, as set in Unraid.
      */
     public function __construct(
         private readonly Platform $platform,
@@ -45,6 +46,7 @@ final class Composition
         private readonly string $runtimeDir,
         private readonly Logger $logger,
         private readonly Notifier $notifier,
+        private readonly Format $format = new Format(),
     ) {
     }
 
@@ -71,6 +73,7 @@ final class Composition
             '/tmp/diskforecast',
             $logger,
             new UnraidNotifier($logger),
+            Format::fromUnraid(),
         );
     }
 
@@ -90,7 +93,7 @@ final class Composition
     }
 
     /**
-     * The saved settings, or defaults (the array and each pool) when nothing is saved yet.
+     * The saved settings, or the defaults (the whole array and each pool) when nothing is saved yet.
      */
     public function settings(): Settings
     {
@@ -162,7 +165,7 @@ final class Composition
 
     public function warningMonitor(): WarningMonitor
     {
-        return new WarningMonitor($this->forecasts(), $this->notifier, $this->pluginDir . '/warnings.json', $this->logger);
+        return new WarningMonitor($this->forecasts(), $this->notifier, $this->pluginDir . '/warnings.json', $this->logger, $this->format);
     }
 
     public function api(): Api
@@ -170,6 +173,10 @@ final class Composition
         return new Api($this);
     }
 
+    /**
+     * What a fresh install tracks, all with the baseline settings: the whole array (when
+     * there is one), then each pool as its own target named after the pool.
+     */
     private function defaults(): Settings
     {
         $targets = [];
@@ -180,11 +187,11 @@ final class Composition
                 continue;
             }
 
-            $targets[] = new Target('pool-' . $unit->name, ucfirst($unit->name), TargetType::Disks, [$unit->name], 60, 180, 0);
+            $targets[] = Target::withBaseline('pool-' . $unit->name, ucfirst($unit->name), TargetType::Disks, [$unit->name]);
         }
 
         if ($hasDisks) {
-            array_unshift($targets, new Target('array', 'Array', TargetType::Array, [], 60, 180, 0));
+            array_unshift($targets, Target::withBaseline('array', 'Array', TargetType::Array, []));
         }
 
         return new Settings($targets);

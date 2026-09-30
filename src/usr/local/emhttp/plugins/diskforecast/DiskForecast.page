@@ -10,7 +10,7 @@ $dfAsset = static fn (string $file): string => "/plugins/diskforecast/assets/{$f
 $dfTheme = in_array($display['theme'] ?? '', ['black', 'gray'], true) ? 'dark' : 'light';
 ?>
 <link rel="stylesheet" href="<?= $dfAsset('diskforecast.css') ?>">
-<div id="df-forecast" class="df-root" data-theme="<?= $dfTheme ?>" data-api="/plugins/diskforecast/api.php" data-settings-url="/Settings/DiskForecastSettings"></div>
+<div id="df-forecast" class="df-root" data-theme="<?= $dfTheme ?>" data-date-format="<?= htmlspecialchars($display['date'] ?? '%c', ENT_QUOTES) ?>" data-number-format="<?= htmlspecialchars($display['number'] ?? '.,', ENT_QUOTES) ?>" data-api="/plugins/diskforecast/api.php" data-settings-url="/Settings/DiskForecastSettings"></div>
 <script src="<?= $dfAsset('chart.umd.min.js') ?>"></script>
 <script src="<?= $dfAsset('common.js') ?>"></script>
 <script src="<?= $dfAsset('forecast.js') ?>"></script>
