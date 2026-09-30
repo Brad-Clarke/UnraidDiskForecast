@@ -22,9 +22,10 @@ final class PreviewComposition
         $logger = new ConsoleLogger();
 
         return new Composition(
-            new FakePlatform("{$root}/data"),
+            new FakePlatform(),
             PreviewData::settingsStore($root, $logger),
-            "{$root}/cache",
+            $root,
+            "{$root}/runtime",
             $logger,
             new ConsoleNotifier(),
         );

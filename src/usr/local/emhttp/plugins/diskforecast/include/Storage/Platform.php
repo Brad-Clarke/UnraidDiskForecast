@@ -30,15 +30,4 @@ interface Platform
      * Current capacity and writable space, or null when the unit is not mounted.
      */
     public function space(StorageUnit $unit): ?Space;
-
-    /**
-     * Whether a folder can be written to right now without creating it somewhere it
-     * should not be (for example under /mnt/user while the array is stopped).
-     */
-    public function pathAvailable(string $path): bool;
-
-    /**
-     * The folder the reading history is kept in.
-     */
-    public function dataDir(): string;
 }

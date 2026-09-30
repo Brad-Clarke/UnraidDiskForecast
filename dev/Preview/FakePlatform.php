@@ -29,13 +29,6 @@ final class FakePlatform implements Platform
         'nvme' => [UnitKind::Pool, 4 * self::TB, 0.06],
     ];
 
-    /**
-     * @param string $dataDir Local folder standing in for the server's readings folder.
-     */
-    public function __construct(private readonly string $dataDir)
-    {
-    }
-
     public function units(): array
     {
         $units = [];
@@ -61,15 +54,5 @@ final class FakePlatform implements Platform
         [, $size, $used] = self::UNITS[$unit->name];
 
         return new Space($size, (int) ($size * (1 - $used)));
-    }
-
-    public function pathAvailable(string $path): bool
-    {
-        return true;
-    }
-
-    public function dataDir(): string
-    {
-        return $this->dataDir;
     }
 }

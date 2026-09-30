@@ -89,5 +89,7 @@ pass "package audit: root-owned, inside $allowed, scripts executable, LF only"
 # 5. The manifest's MD5 matches the package.
 declared="$(sed -n 's/.*<!ENTITY md5 *"\([0-9a-f]*\)">.*/\1/p' "$plg")"
 actual="$(md5sum "$package" | cut -d' ' -f1)"
-[ -n "$declared" ] && [ "$declared" = "$actual" ] || fail "manifest MD5 '$declared' does not match package MD5 '$actual'"
+if [ -z "$declared" ] || [ "$declared" != "$actual" ]; then
+  fail "manifest MD5 '$declared' does not match package MD5 '$actual'"
+fi
 pass "manifest MD5 matches $(basename "$package")"

@@ -29,17 +29,23 @@ while measuring a share meant scanning its folders, and nothing is scanned any m
   ...); names may not contain `"`. Written only when the user presses Apply. While
   `AUTO_TARGETS="yes"` (the default) the plugin tracks the whole array plus each pool, hourly,
   180-day window, no warnings, so readings start at install.
-- **Readings:** one CSV per target (`time,size,used,free`) in the readings folder, which is
-  not a setting (2026-09-30: other plugins do not ask either). It is the first pool holding
-  `appdata`, addressed directly (`/mnt/cache/appdata/diskforecast`), because a path through
-  `/mnt/user` makes the share filesystem look on array disks too; `/mnt/user/appdata/diskforecast`
-  when no pool holds appdata. The Settings page shows where it is. Nothing is written while
-  the folder's mount is missing (array stopped). Removing a target that has readings asks
-  first (how many readings, since when); its file is deleted when Apply saves the settings.
-- **Forecast cache and lock:** `/tmp/diskforecast` (RAM), keyed by history size, modification
-  time and window.
-- **Warning state:** `<readings folder>/state/warnings.json`, written only when a warning is
-  sent or cleared.
+- **Readings (2026-10-01):** one CSV per target (`time,size,used,free`, about 50 bytes a
+  reading) in `/boot/config/plugins/diskforecast/history/` on the flash drive, the way plugins
+  keep their data (Disk Location keeps its database in its flash folder). New readings are
+  appended to `/tmp/diskforecast/pending/` in RAM and moved onto the flash drive once a day
+  and when the array stops (`event/stopping`, which also runs on reboot and shutdown), so
+  the stick sees one small append per target per day, not a write at every reading. An
+  unclean shutdown loses at most a day of readings. It needs no array or pool and wakes no
+  disk. Earlier the readings went to the pool's appdata folder, which is the Docker
+  convention, paused whenever the array was stopped, and could fall back to an array disk.
+  Plain CSV rather than SQLite or JSON: a save only appends lines, where JSON rewrites the
+  whole file and SQLite rewrites pages and a journal.
+- Removing a target that has readings asks first (how many readings, since when); its files
+  are deleted when Apply saves the settings.
+- **Forecast cache and lock:** `/tmp/diskforecast` (RAM), keyed by the history files' sizes,
+  modification times and the window.
+- **Warning state:** `/boot/config/plugins/diskforecast/warnings.json`, written only when a
+  warning is sent or cleared.
 
 ## 2026-09-30: Where the pages live
 
@@ -66,14 +72,13 @@ Following Unraid's convention of viewing under Tools and configuring under Setti
   is the versioned release asset. The install script deletes older cached packages, copies
   `default.cfg` only if there is no settings file, writes the cron file only when its line
   changes (no flash write on an ordinary boot) and needs no network. Remove stops the cron job
-  first, deletes the readings (2026-10-01: the owner wants nothing left behind), then removes
-  the package, the plugin folder, `/boot/config/plugins/diskforecast` (settings and cached
-  package) and `/tmp/diskforecast`. The readings folder comes from `scripts/data-dir.php`,
-  and only a path ending in `/appdata/diskforecast` under `/mnt` is deleted; while the array
-  is stopped it cannot be reached, so it is left and the uninstall says so. Updates never run
-  the remove script, so they keep settings and readings.
-- **Array start:** `event/disks_mounted` takes due readings as soon as the disks mount; the
-  cron run already skips while the readings folder's mount is missing.
+  first, then removes the package, the plugin folder, `/boot/config/plugins/diskforecast`
+  (settings, readings and cached package) and `/tmp/diskforecast` (pending readings):
+  nothing is left behind (2026-10-01, the owner's choice). Updates never run the remove
+  script and do not touch either folder, so they keep settings and readings.
+- **Array events:** `event/disks_mounted` takes due readings as soon as the disks mount;
+  `event/stopping` saves pending readings to the flash drive. A target whose disks are not
+  all mounted is skipped.
 - **Checks** (`scripts/ci-checks.sh`, `test-install-scripts.sh`, `test-release-checks.sh`)
   run in CI on every pull request and push to main, and again in the release workflow. The
   release gate (`scripts/release-checks.sh`) refuses a bad tag, an impossible date, a version
@@ -89,6 +94,9 @@ Following Unraid's convention of viewing under Tools and configuring under Setti
   - The pages keep the plugin's own styles (light and dark themes follow Unraid's theme)
     rather than stock webGui styling. Nothing is loaded from outside the plugin: Chart.js is
     bundled.
+  - The reading history lives on the flash drive although the brief keeps flash for config
+    and the cached package. It keeps the brief's aim (no steady writes wearing the stick)
+    by batching: readings wait in RAM and are appended once a day and when the array stops.
 
 ## 2026-09-28: Schedule
 

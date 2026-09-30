@@ -137,31 +137,6 @@ final class UnraidPlatform implements Platform
         return new Space((int) $total, (int) $free);
     }
 
-    public function pathAvailable(string $path): bool
-    {
-        if (preg_match('#^(/mnt/[^/]+)/#', $path, $match) !== 1) {
-            return false;
-        }
-
-        return $this->isMounted($match[1]);
-    }
-
-    /**
-     * The appdata folder on a pool, addressed directly (/mnt/cache/appdata/diskforecast):
-     * going through /mnt/user makes the share filesystem look on array disks too, which
-     * can wake them. Falls back to /mnt/user when no pool holds appdata.
-     */
-    public function dataDir(): string
-    {
-        foreach ($this->units() as $unit) {
-            if ($unit->kind === UnitKind::Pool && $this->isMounted($unit->mount) && is_dir("{$unit->mount}/appdata")) {
-                return "{$unit->mount}/appdata/diskforecast";
-            }
-        }
-
-        return '/mnt/user/appdata/diskforecast';
-    }
-
     private function isMounted(string $mountPoint): bool
     {
         if ($this->mounts === null) {

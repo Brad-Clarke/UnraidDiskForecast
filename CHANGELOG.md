@@ -9,3 +9,4 @@
 - Dashboard tile showing every target's time to full.
 - Warnings through Unraid notifications when a target is due to fill within your chosen window.
 - Readings come from free-space figures only: no folders are scanned and no disks are woken.
+- Readings are kept on the flash drive in the plugin's own folder, saved once a day and when the array stops.

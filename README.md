@@ -16,7 +16,9 @@ for new drives before you need them.
 - **Warnings** through Unraid notifications when a target is due to fill within your window.
 
 It only reads free-space figures the filesystem already keeps: no folder is scanned and no
-disk is woken. Readings are kept in your pool's `appdata` folder, never on the flash drive.
+disk is woken. Readings are kept in the plugin's folder on the flash drive
+(`/boot/config/plugins/diskforecast/history`), saved from RAM once a day and when the array
+stops, so the USB stick sees one small write per target per day.
 How the forecast works and why it was chosen: [docs/decisions.md](docs/decisions.md).
 
 ## Install
@@ -28,8 +30,7 @@ https://github.com/Brad-Clarke/UnraidDiskForecast/releases/latest/download/diskf
 ```
 
 Requires Unraid 7.0 or later. Updates arrive through Unraid's plugin manager and keep your
-settings and readings. Removing the plugin deletes both (start the array first, or the
-readings folder can't be reached and is left behind).
+settings and readings. Removing the plugin deletes both.
 
 **Support:** the Disk Forecast thread on the Unraid forums (link to follow).
 

@@ -8,12 +8,12 @@ use DiskForecast\Config\Settings;
 use DiskForecast\HistoryStore;
 use DiskForecast\Sample;
 use DiskForecast\Storage\Inventory;
-use DiskForecast\Storage\Platform;
 
 /**
  * Takes a reading for every target whose interval has passed.
  *
- * Runs from cron every 15 minutes; each target decides for itself whether it is due.
+ * Runs from cron every 15 minutes; each target decides for itself whether it is due. A
+ * target whose disks are not all mounted (array stopped) is skipped.
  */
 final class Sampler
 {
@@ -22,10 +22,8 @@ final class Sampler
 
     public function __construct(
         private readonly Settings $settings,
-        private readonly Platform $platform,
         private readonly Inventory $inventory,
         private readonly HistoryStore $store,
-        private readonly string $dataDir,
     ) {
     }
 
@@ -36,10 +34,6 @@ final class Sampler
      */
     public function run(int $now): array
     {
-        if (!$this->platform->pathAvailable($this->dataDir)) {
-            return ["Readings folder {$this->dataDir} is not available (array stopped?); no readings taken."];
-        }
-
         $report = [];
         foreach ($this->settings->targets as $target) {
             $last = $this->store->lastTime($target->id);

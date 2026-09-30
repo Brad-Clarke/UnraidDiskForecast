@@ -26,7 +26,7 @@
       self.inventory = data.inventory;
       self.options = data.options;
       self.saved = data.saved;
-      self.dataDir = data.dataDir;
+      self.historyDir = data.historyDir;
       self.history = data.history;
       self.state = JSON.parse(JSON.stringify(data.settings));
       self.original = JSON.stringify(data.settings);
@@ -57,7 +57,7 @@
 
   SettingsView.prototype.toolbar = function () {
     return el('div', { className: 'df-toolbar' }, [
-      el('span', { className: 'df-faint' }, ['Readings are kept in ', el('code', { text: this.dataDir }), '.']),
+      el('span', { className: 'df-faint' }, ['Readings are saved to the flash drive in ', el('code', { text: this.historyDir }), ' once a day and when the array stops.']),
       el('a', { className: 'df-button', href: this.forecastUrl }, [DF.icon('area-chart'), 'View forecast'])
     ]);
   };
@@ -289,7 +289,7 @@
             lines.push('Deleted the readings of ' + data.deleted.join(', ') + '.');
           }
           if (data.notDeleted.length) {
-            lines.push('Could not delete the readings of ' + data.notDeleted.join(', ') + ' (is the array stopped?). They are still in ' + self.dataDir + '/history.');
+            lines.push('Could not delete the readings of ' + data.notDeleted.join(', ') + '. They are still in ' + self.historyDir + '; see the system log.');
           }
           self.render(el('div', { className: 'df-notice' + (data.notDeleted.length ? ' is-warning' : '') }, [
             DF.icon(data.notDeleted.length ? 'exclamation-triangle' : 'check'),

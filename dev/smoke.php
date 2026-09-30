@@ -19,8 +19,9 @@ use DiskForecast\Dev\Preview\ConsoleLogger;
 use DiskForecast\Dev\Preview\ConsoleNotifier;
 use DiskForecast\Dev\Preview\FakePlatform;
 use DiskForecast\Dev\Preview\PreviewData;
-use DiskForecast\HistoryStore;
 use DiskForecast\Sample;
+use DiskForecast\Storage\StorageUnit;
+use DiskForecast\Storage\UnitKind;
 use DiskForecast\Storage\UnraidPlatform;
 
 $failures = 0;
@@ -46,7 +47,7 @@ $expected['targets'][2]['name'] = 'Fast pools';
 $check($loaded !== null && $loaded->toArray() === $expected, 'settings round-trip through diskforecast.cfg (quotes dropped from names)');
 $check(str_contains((string) file_get_contents("{$root}/diskforecast.cfg"), 'TARGET_3_MEMBERS="cache,nvme"'), 'the file is plain key="value" lines');
 $store->save(new Settings(array_slice($saved->targets, 0, 2)));
-$app = new Composition(new FakePlatform("{$root}/data"), $store, "{$root}/cache", $logger, $notifier);
+$app = new Composition(new FakePlatform(), $store, $root, "{$root}/runtime", $logger, $notifier);
 
 $now = 1_800_000_000;
 $report = $app->sampler()->run($now);
@@ -54,9 +55,21 @@ $check(str_contains($report[0], 'recorded') && str_contains($report[1], 'recorde
 $check(str_contains($app->sampler()->run($now + 600)[0], 'not due'), 'a reading 10 minutes later is not due');
 $check(str_contains($app->sampler()->run($now + 3600 - 60)[0], 'recorded'), 'a reading one minute early still counts');
 
-$history = new HistoryStore("{$root}/data", $logger);
+$history = $app->historyStore();
 $check($history->read('array')->count() === 2, 'array history holds two readings');
-$check($history->lastTime('array') === $now + 3540, 'last reading time is read from the end of the file');
+$check(!is_file($history->savedPath('array')), 'readings wait in RAM: nothing is written to the flash drive yet');
+$check($history->lastTime('array') === $now + 3540, 'last reading time is read from the end of the pending file');
+$check(!$history->saveDue($now, Composition::SAVE_INTERVAL_SECONDS), 'the first check after a boot only starts the save clock');
+$check(!$history->saveDue($now + 3600, Composition::SAVE_INTERVAL_SECONDS), 'no save is due an hour later');
+$check($history->saveDue($now + 86400, Composition::SAVE_INTERVAL_SECONDS), 'a save is due a day later');
+$check($history->save($now + 86400) && !$history->saveDue($now + 86400, Composition::SAVE_INTERVAL_SECONDS), 'saving restarts the clock');
+$savedText = (string) file_get_contents($history->savedPath('array'));
+$check(substr_count($savedText, "\n") === 3 && str_starts_with($savedText, "time,size,used,free\n"), 'saving moves both readings onto the flash drive, with the header once');
+$check($history->read('array')->count() === 2 && $history->lastTime('array') === $now + 3540, 'after a save the history reads the same, from the flash file');
+$check(str_contains($app->sampler()->run($now + 7200)[0], 'recorded') && $history->read('array')->count() === 3, 'new readings pend again and read together with the saved ones');
+$history->save($now + 7300);
+$check(substr_count((string) file_get_contents($history->savedPath('array')), "\n") === 4, 'the next save appends only the new reading');
+$check($history->save($now + 7400), 'saving with nothing pending succeeds and writes nothing');
 $latest = $history->read('array')->latest();
 $check($latest->size === 112_000_000_000_000, 'array size is the six data disks added together');
 
@@ -92,9 +105,10 @@ $check(($shares['Media'] ?? '') === 'disk1,disk2,cache', 'Media: included disks 
 $check(($shares['appdata'] ?? '') === 'cache', 'appdata: pool only (' . ($shares['appdata'] ?? '-') . ')');
 $check(($shares['Backups'] ?? '') === 'disk2,disk3', 'Backups: all disks minus excluded and globally excluded (' . ($shares['Backups'] ?? '-') . ')');
 $check(($shares['fast'] ?? '') === 'cache,nvme', 'fast: pool with a secondary pool, no array (' . ($shares['fast'] ?? '-') . ')');
-$check($unraid->pathAvailable('/mnt/cache/appdata/diskforecast'), 'a folder on a mounted pool is available');
-$check(!$unraid->pathAvailable('/mnt/user/appdata/diskforecast'), 'a folder under an unmounted /mnt/user is not');
-$check($unraid->dataDir() === '/mnt/user/appdata/diskforecast', 'with no appdata folder on a pool, readings go to /mnt/user/appdata');
+$check($unraid->space(new StorageUnit('disk4', UnitKind::Disk, '/mnt/disk4')) === null, 'an unmounted disk is never measured');
+
+$history->delete('array');
+$check(!is_file($history->savedPath('array')) && $history->read('array')->count() === 0, 'deleting a target removes its saved and pending readings');
 
 $remove = static function (string $dir) use (&$remove): void {
     foreach (glob("{$dir}/*") ?: [] as $entry) {

@@ -45,16 +45,6 @@
     var self = this;
     var children = [];
 
-    if (!data.dataDirAvailable) {
-      children.push(el('div', { className: 'df-notice is-warning' }, [
-        DF.icon('exclamation-triangle'),
-        el('div', {}, [
-          el('strong', { text: 'Readings are paused. ' }),
-          'The readings folder ' + data.dataDir + ' is not available, usually because the array is stopped. Readings resume when it is back.'
-        ])
-      ]));
-    }
-
     if (!data.saved) {
       children.push(el('div', { className: 'df-notice' }, [
         DF.icon('info-circle'),

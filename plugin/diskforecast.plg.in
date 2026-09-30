@@ -42,11 +42,6 @@ echo "&name; &version; installed"
 <INLINE>
 rm -f &plgdir;/&name;.cron
 /usr/local/sbin/update_cron
-readings="$(/usr/bin/php &emhttp;/scripts/data-dir.php 2&gt;/dev/null || true)"
-case "$readings" in
-  /mnt/*/appdata/&name;) rm -rf "$readings" ;;
-  *) echo "The readings folder is not available (is the array stopped?), so it was not deleted: remove appdata/&name; by hand." ;;
-esac
 removepkg &pkg;
 rm -rf &emhttp; &plgdir; /tmp/&name;
 echo "&name; removed"

@@ -38,8 +38,7 @@ final class ForecastService
      */
     public function forecast(Target $target): TargetForecast
     {
-        [$size, $modified] = $this->store->fingerprint($target->id);
-        $key = md5(implode('|', [self::CACHE_VERSION, $target->id, $target->windowDays, $size, $modified]));
+        $key = md5(implode('|', [self::CACHE_VERSION, $target->id, $target->windowDays, ...$this->store->fingerprint($target->id)]));
         $path = "{$this->cacheDir}/{$target->id}-{$key}.ser";
         $cached = $this->readCache($path);
         if ($cached !== null) {

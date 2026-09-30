@@ -1,0 +1,4 @@
+#!/bin/bash
+# Disk Forecast: the array is stopping (also on reboot and shutdown), so save the readings
+# taken since the last save from RAM to the flash drive before they are lost.
+/usr/bin/php /usr/local/emhttp/plugins/diskforecast/scripts/sample.php --save >/dev/null 2>&1

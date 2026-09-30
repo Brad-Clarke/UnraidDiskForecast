@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 # Runs the built manifest's install script twice and its remove script twice inside a
-# sandbox (paths under /boot, /usr/local/emhttp, /mnt and /tmp redirected; update_cron,
-# removepkg and php stubbed) and checks they are idempotent and need no network:
+# sandbox (paths under /boot, /usr/local/emhttp and /tmp redirected; update_cron and
+# removepkg stubbed) and checks they are idempotent and need no network:
 #   install: removes older cached packages, keeps the current one, creates the settings file
 #            once and never overwrites the user's or the readings (an update keeps all data),
 #            writes the cron file only when it changes;
-#   remove:  stops the cron job first, deletes the readings, removes the package, the plugin
-#            folder and settings, succeeds when run again, and leaves the readings (saying so)
-#            when their folder is not mounted.
+#   remove:  stops the cron job first, removes the package, the plugin folder, the settings
+#            and readings (saved and pending), and succeeds when run again.
 #
 # Usage: scripts/test-install-scripts.sh   (after scripts/build.sh)
 set -euo pipefail
@@ -35,11 +34,8 @@ for stub in update_cron removepkg; do
   printf '#!/usr/bin/env bash\necho "%s $*" >> "%s"\n' "$stub" "$calls" > "$sandbox/bin/$stub"
   chmod +x "$sandbox/bin/$stub"
 done
-# php stands in for scripts/data-dir.php: it prints whatever the test puts in php-output.
-printf '#!/usr/bin/env bash\ncat "%s"\n' "$sandbox/php-output" > "$sandbox/bin/php"
-chmod +x "$sandbox/bin/php"
-readings="$sandbox/mnt/cache/appdata/$name"
-echo "$readings" > "$sandbox/php-output"
+readings="$plgdir/history"
+pending="$sandbox/tmp/$name/pending"
 
 # Python writes @SANDBOX@ and bash fills it in, so both sides use the same form of the path.
 "$python" - "$plg" "$sandbox/raw" <<'PY'
@@ -52,9 +48,7 @@ for node in doc.getElementsByTagName("FILE"):
         continue
     text = "".join(c.data for c in inline[0].childNodes if c.nodeType in (c.TEXT_NODE, c.CDATA_SECTION_NODE))
     text = (text.replace("/usr/local/sbin/update_cron", "update_cron")
-                .replace("/usr/bin/php", "php")
                 .replace("/tmp/diskforecast", "@SANDBOX@/tmp/diskforecast")
-                .replace("/mnt/", "@SANDBOX@/mnt/")
                 .replace("/boot/", "@SANDBOX@/boot/")
                 .replace("/usr/local/emhttp/", "@SANDBOX@/usr/local/emhttp/"))
     which = "remove" if node.getAttribute("Method") == "remove" else "install"
@@ -77,8 +71,9 @@ check "the manifest's scripts use no network" "! grep -Eq 'curl|wget' '$sandbox/
 cp "$package" "$plgdir/"
 touch "$plgdir/$name-2020.01.01-noarch-1.txz"
 tar -xJf "$package" -C "$sandbox"
-mkdir -p "$readings/history"
-echo "time,size,used,free" > "$readings/history/array.csv"
+mkdir -p "$readings" "$pending"
+echo "time,size,used,free" > "$readings/array.csv"
+echo "1800000000,1,1,0" > "$pending/array.csv"
 
 run install
 check "install removes older cached packages" "[ ! -e '$plgdir/$name-2020.01.01-noarch-1.txz' ]"
@@ -93,27 +88,15 @@ cron_time="$(stat -c %Y "$plgdir/$name.cron")"
 run install
 check "installing again succeeds and keeps the user's settings" "grep -q 'AUTO_TARGETS=\"no\"' '$plgdir/$name.cfg'"
 check "installing again does not rewrite an unchanged cron file (no flash write)" "[ \"\$(stat -c %Y '$plgdir/$name.cron')\" = '$cron_time' ]"
-check "installing (and so updating) never touches the readings" "[ -f '$readings/history/array.csv' ]"
+check "installing (and so updating) keeps saved and pending readings" "[ -f '$readings/array.csv' ] && [ -f '$pending/array.csv' ]"
 
 : > "$calls"
 run remove
 check "remove stops the cron job before removing the package" "[ \"\$(head -1 '$calls')\" = 'update_cron ' ] && grep -qx 'removepkg $pkg' '$calls'"
-check "remove deletes the readings" "[ ! -e '$readings' ]"
 check "remove deletes the plugin folder" "[ ! -e '$emhttp' ]"
-check "remove deletes the settings, cron file and cached package" "[ ! -e '$plgdir' ]"
-check "remove deletes the runtime folder" "[ ! -e '$sandbox/tmp/$name' ]"
+check "remove deletes the settings, saved readings, cron file and cached package" "[ ! -e '$plgdir' ]"
+check "remove deletes the pending readings and the rest of the runtime folder" "[ ! -e '$sandbox/tmp/$name' ]"
 run remove
 check "removing again succeeds" "true"
-
-mkdir -p "$readings/history"
-echo "time,size,used,free" > "$readings/history/array.csv"
-: > "$sandbox/php-output"
-# shellcheck disable=SC2034 # read by the next check's eval
-said="$(PATH="$sandbox/bin:$PATH" bash "$sandbox/remove.sh")"
-check "with the array stopped, remove keeps the readings" "[ -f '$readings/history/array.csv' ]"
-check "with the array stopped, remove says the readings were not deleted" "grep -q 'was not deleted' <<<\"\$said\""
-echo "$sandbox/mnt/cache/appdata" > "$sandbox/php-output"
-PATH="$sandbox/bin:$PATH" bash "$sandbox/remove.sh" > /dev/null
-check "remove never deletes a folder that is not appdata/$name" "[ -d '$sandbox/mnt/cache/appdata' ]"
 
 [ "$failures" -eq 0 ] || { echo "$failures install script test(s) failed" >&2; exit 1; }

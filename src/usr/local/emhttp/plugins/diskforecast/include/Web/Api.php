@@ -53,8 +53,6 @@ final class Api
 
         return [200, [
             'saved' => $this->app->hasSavedSettings(),
-            'dataDirAvailable' => $this->app->dataDirAvailable(),
-            'dataDir' => $this->app->dataDir(),
             'targets' => $targets,
         ]];
     }
@@ -117,7 +115,7 @@ final class Api
         return [200, [
             'settings' => $this->app->settings()->toArray(),
             'saved' => $this->app->hasSavedSettings(),
-            'dataDir' => $this->app->dataDir(),
+            'historyDir' => $this->app->historyDir(),
             'history' => (object) $history,
             'inventory' => ['disks' => $disks, 'pools' => $pools, 'shares' => $shares],
             'options' => [

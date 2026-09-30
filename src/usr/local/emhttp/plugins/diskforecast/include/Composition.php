@@ -26,16 +26,23 @@ use DiskForecast\Web\Api;
  */
 final class Composition
 {
+    /** How often pending readings are saved to the flash drive, besides when the array stops. */
+    public const SAVE_INTERVAL_SECONDS = 86400;
+
     private ?Settings $settings = null;
     private ?bool $saved = null;
-    private ?string $dataDir = null;
     private ?Inventory $inventory = null;
     private ?ForecastService $forecasts = null;
 
+    /**
+     * @param string $pluginDir The plugin's folder on the flash drive: saved readings and warning state.
+     * @param string $runtimeDir The plugin's folder in RAM: pending readings, forecast cache, lock.
+     */
     public function __construct(
         private readonly Platform $platform,
         private readonly SettingsStore $settingsStore,
-        private readonly string $cacheDir,
+        private readonly string $pluginDir,
+        private readonly string $runtimeDir,
         private readonly Logger $logger,
         private readonly Notifier $notifier,
     ) {
@@ -60,6 +67,7 @@ final class Composition
                 $logger,
                 function_exists('parse_plugin_cfg') ? static fn (): array => parse_plugin_cfg('diskforecast') : null,
             ),
+            '/boot/config/plugins/diskforecast',
             '/tmp/diskforecast',
             $logger,
             new UnraidNotifier($logger),
@@ -122,39 +130,39 @@ final class Composition
     }
 
     /**
-     * The readings folder, chosen by the platform (the pool that holds appdata).
+     * Where saved readings live on the flash drive.
      */
-    public function dataDir(): string
+    public function historyDir(): string
     {
-        return $this->dataDir ??= $this->platform->dataDir();
+        return $this->pluginDir . '/history';
     }
 
     /**
-     * Whether the readings folder can be used right now (false while the array is stopped).
+     * The plugin's folder in RAM; the cron run keeps its lock here.
      */
-    public function dataDirAvailable(): bool
+    public function runtimeDir(): string
     {
-        return $this->platform->pathAvailable($this->dataDir());
+        return $this->runtimeDir;
     }
 
     public function historyStore(): HistoryStore
     {
-        return new HistoryStore($this->dataDir(), $this->logger);
+        return new HistoryStore($this->historyDir(), $this->runtimeDir . '/pending', $this->logger);
     }
 
     public function forecasts(): ForecastService
     {
-        return $this->forecasts ??= new ForecastService($this->historyStore(), $this->cacheDir . '/forecasts', $this->logger);
+        return $this->forecasts ??= new ForecastService($this->historyStore(), $this->runtimeDir . '/forecasts', $this->logger);
     }
 
     public function sampler(): Sampler
     {
-        return new Sampler($this->settings(), $this->platform, $this->inventory(), $this->historyStore(), $this->dataDir());
+        return new Sampler($this->settings(), $this->inventory(), $this->historyStore());
     }
 
     public function warningMonitor(): WarningMonitor
     {
-        return new WarningMonitor($this->forecasts(), $this->notifier, $this->dataDir() . '/state/warnings.json', $this->logger);
+        return new WarningMonitor($this->forecasts(), $this->notifier, $this->pluginDir . '/warnings.json', $this->logger);
     }
 
     public function api(): Api

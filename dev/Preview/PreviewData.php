@@ -37,8 +37,7 @@ final class PreviewData
             return;
         }
 
-        $dataDir = "{$root}/data";
-        @mkdir("{$dataDir}/history", 0777, true);
+        @mkdir("{$root}/history", 0777, true);
         $now = intdiv(time(), 3600) * 3600;
         $filling = [];
         foreach (ScenarioLibrary::filling() as $scenario) {
@@ -60,11 +59,11 @@ final class PreviewData
             [new Target('pool-nvme', 'Nvme', TargetType::Disks, ['nvme'], 60, 180, 0), self::firstDays($filling['steady'], 3)],
         ];
 
-        $inventory = new Inventory(new FakePlatform($dataDir));
+        $inventory = new Inventory(new FakePlatform());
         $targets = [];
         foreach ($plan as [$target, $history]) {
             $capacity = (float) $inventory->spaceFor($target)->size;
-            HistoryFile::write("{$dataDir}/history/{$target->id}.csv", self::endingAt($history, $now, $capacity));
+            HistoryFile::write("{$root}/history/{$target->id}.csv", self::endingAt($history, $now, $capacity));
             $targets[] = $target;
         }
 
