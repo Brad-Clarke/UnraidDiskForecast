@@ -33,7 +33,7 @@ cron="*/15 * * * * &emhttp;/scripts/sample.php &gt;/dev/null 2&gt;&amp;1"
 if [ "$(cat &plgdir;/&name;.cron 2&gt;/dev/null)" != "$cron" ]; then
   printf '%s\n' "$cron" &gt; &plgdir;/&name;.cron
 fi
-/usr/local/sbin/update_cron
+{ crontab -c /etc/cron.d -l 2&gt;/dev/null | grep -vF "&emhttp;/scripts/sample.php" || true; printf '%s\n' "$cron"; } | crontab -c /etc/cron.d -
 echo "&name; &version; installed"
 </INLINE>
 </FILE>
@@ -41,7 +41,7 @@ echo "&name; &version; installed"
 <FILE Run="/bin/bash" Method="remove">
 <INLINE>
 rm -f &plgdir;/&name;.cron
-/usr/local/sbin/update_cron
+{ crontab -c /etc/cron.d -l 2&gt;/dev/null | grep -vF "&emhttp;/scripts/sample.php" || true; } | crontab -c /etc/cron.d -
 removepkg &pkg;
 rm -rf &emhttp; &plgdir; /tmp/&name;
 echo "&name; removed"

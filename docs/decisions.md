@@ -129,7 +129,16 @@ Following Unraid's convention of viewing under Tools and configuring under Setti
 ## 2026-09-28: Schedule
 
 One cron line runs every 15 minutes; each target takes a reading when its own interval has
-passed (up to two minutes early counts, so cron jitter never skips a slot). The same run checks
+passed (up to two minutes early counts, so cron jitter never skips a slot).
+
+**2026-10-01, from the first real install:** Unraid's `update_cron` only reads the `.cron`
+files of plugins listed in `/var/log/plugins/`, and the plugin manager adds a plugin to that
+list only after its install scripts succeed. So `update_cron` called from our own install
+left the job out, and no reading was ever taken until something else rebuilt the crontab.
+The install script now also puts the line into root's crontab itself (dropping any old copy
+of it first), and remove takes it out itself; the `.cron` file stays so later `update_cron`
+runs keep including it. `scripts/test-install-scripts.sh` checks this against a stand-in
+crontab that already holds another plugin's job. The same run checks
 warnings: one notification when a target first falls inside its threshold, then weekly while
 it stays there, through Unraid's own notify script.
 

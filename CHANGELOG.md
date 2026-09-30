@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026.10.01
+
+- Fixed readings never starting after a fresh install: the reading schedule is now set up during installation instead of waiting for the next reboot.
+
 ## 2026.09.30
 
 - First release.
