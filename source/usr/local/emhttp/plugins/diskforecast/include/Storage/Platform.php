@@ -38,12 +38,7 @@ interface Platform
     public function pathAvailable(string $path): bool;
 
     /**
-     * Why a folder is not acceptable for the reading history, or null when it is.
+     * The folder the reading history is kept in.
      */
-    public function dataDirProblem(string $path): ?string;
-
-    /**
-     * The readings folder to use before the user chooses one.
-     */
-    public function defaultDataDir(): string;
+    public function dataDir(): string;
 }

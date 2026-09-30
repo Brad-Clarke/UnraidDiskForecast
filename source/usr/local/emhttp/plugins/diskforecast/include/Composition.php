@@ -28,6 +28,7 @@ final class Composition
 {
     private ?Settings $settings = null;
     private ?bool $saved = null;
+    private ?string $dataDir = null;
     private ?Inventory $inventory = null;
     private ?ForecastService $forecasts = null;
 
@@ -111,9 +112,25 @@ final class Composition
         return true;
     }
 
+    /**
+     * The readings folder, chosen by the platform (the pool that holds appdata).
+     */
+    public function dataDir(): string
+    {
+        return $this->dataDir ??= $this->platform->dataDir();
+    }
+
+    /**
+     * Whether the readings folder can be used right now (false while the array is stopped).
+     */
+    public function dataDirAvailable(): bool
+    {
+        return $this->platform->pathAvailable($this->dataDir());
+    }
+
     public function historyStore(): HistoryStore
     {
-        return new HistoryStore($this->settings()->dataDir, $this->logger);
+        return new HistoryStore($this->dataDir(), $this->logger);
     }
 
     public function forecasts(): ForecastService
@@ -123,12 +140,12 @@ final class Composition
 
     public function sampler(): Sampler
     {
-        return new Sampler($this->settings(), $this->platform, $this->inventory(), $this->historyStore());
+        return new Sampler($this->settings(), $this->platform, $this->inventory(), $this->historyStore(), $this->dataDir());
     }
 
     public function warningMonitor(): WarningMonitor
     {
-        return new WarningMonitor($this->forecasts(), $this->notifier, $this->settings()->dataDir . '/state/warnings.json', $this->logger);
+        return new WarningMonitor($this->forecasts(), $this->notifier, $this->dataDir() . '/state/warnings.json', $this->logger);
     }
 
     public function api(): Api
@@ -146,13 +163,13 @@ final class Composition
                 continue;
             }
 
-            $targets[] = new Target('pool-' . $unit->name, ucfirst($unit->name), TargetType::Pool, [$unit->name], 60, 180, 0);
+            $targets[] = new Target('pool-' . $unit->name, ucfirst($unit->name), TargetType::Disks, [$unit->name], 60, 180, 0);
         }
 
         if ($hasDisks) {
             array_unshift($targets, new Target('array', 'Array', TargetType::Array, [], 60, 180, 0));
         }
 
-        return new Settings($this->platform->defaultDataDir(), false, $targets);
+        return new Settings($targets);
     }
 }

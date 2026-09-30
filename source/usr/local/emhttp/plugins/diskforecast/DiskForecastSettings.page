@@ -1,6 +1,7 @@
-Menu="DiskForecast:2"
-Title="Settings"
-Tag="cog"
+Menu="Utilities"
+Title="Disk Forecast"
+Icon="area-chart"
+Tag="area-chart"
 Markdown="false"
 ---
 <?php
@@ -9,6 +10,6 @@ $dfAsset = static fn (string $file): string => "/plugins/diskforecast/assets/{$f
 $dfTheme = in_array($display['theme'] ?? '', ['black', 'gray'], true) ? 'dark' : 'light';
 ?>
 <link rel="stylesheet" href="<?= $dfAsset('diskforecast.css') ?>">
-<div id="df-settings" class="df-root" data-theme="<?= $dfTheme ?>" data-api="/plugins/diskforecast/api.php" data-csrf="<?= htmlspecialchars($var['csrf_token'] ?? '', ENT_QUOTES) ?>" data-done-url="/Settings"></div>
+<div id="df-settings" class="df-root" data-theme="<?= $dfTheme ?>" data-api="/plugins/diskforecast/api.php" data-csrf="<?= htmlspecialchars($var['csrf_token'] ?? '', ENT_QUOTES) ?>" data-forecast-url="/Tools/DiskForecast" data-done-url="/Settings"></div>
 <script src="<?= $dfAsset('common.js') ?>"></script>
 <script src="<?= $dfAsset('settings.js') ?>"></script>

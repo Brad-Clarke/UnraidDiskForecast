@@ -9,19 +9,11 @@ namespace DiskForecast\Config;
  */
 final class Settings
 {
-    /** Where readings are kept unless the user chooses otherwise. */
-    public const DEFAULT_DATA_DIR = '/mnt/user/appdata/diskforecast';
-
     /**
-     * @param string $dataDir Folder holding the reading history.
-     * @param bool $sharesEnabled Whether share targets may be created.
      * @param list<Target> $targets What is tracked, in display order.
      */
-    public function __construct(
-        public readonly string $dataDir,
-        public readonly bool $sharesEnabled,
-        public readonly array $targets,
-    ) {
+    public function __construct(public readonly array $targets)
+    {
     }
 
     /**
@@ -43,11 +35,7 @@ final class Settings
      */
     public function toArray(): array
     {
-        return [
-            'dataDir' => $this->dataDir,
-            'sharesEnabled' => $this->sharesEnabled,
-            'targets' => array_map(static fn (Target $t): array => $t->toArray(), $this->targets),
-        ];
+        return ['targets' => array_map(static fn (Target $t): array => $t->toArray(), $this->targets)];
     }
 
     /**
@@ -65,10 +53,6 @@ final class Settings
             }
         }
 
-        return new self(
-            is_string($data['dataDir'] ?? null) ? $data['dataDir'] : self::DEFAULT_DATA_DIR,
-            (bool) ($data['sharesEnabled'] ?? false),
-            $targets,
-        );
+        return new self($targets);
     }
 }

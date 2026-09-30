@@ -165,65 +165,106 @@
     return days + ' days';
   }
 
-  function typeLabel(target) {
-    switch (target.type) {
-      case 'array': return 'Whole array';
-      case 'pool': return 'Pool · ' + (target.members[0] || '');
-      case 'share': return 'Share · ' + (target.members[0] || '');
-      default: return target.members.length === 1 ? 'Disk · ' + target.members[0] : target.members.length + ' disks';
-    }
-  }
-
-  /** The chip, meter colour and headline for a target's forecast. */
-  function describe(target) {
-    var full = target.status === 'full';
-    var info = {
-      chip: null,
-      meter: full ? 'is-critical' : (target.warning ? 'is-warning' : ''),
-      label: '',
-      value: '',
-      date: '',
-      facts: []
-    };
-
-    if (target.warning && !full) {
-      info.chip = { kind: 'is-warning', icon: 'exclamation-triangle', text: 'Within ' + warnLabel(target.warnDays) };
-    }
+  /**
+   * The headline of a target's forecast: the time to full (or state), its colour, the date,
+   * and the extra lines the Forecast page shows under the meter.
+   */
+  function rowStatus(target) {
+    var status = { text: '', kind: '', icon: null, date: '', notes: [] };
 
     if (!target.readings) {
-      info.label = 'Waiting for the first reading';
-      info.value = 'No data yet';
-      info.date = 'A reading is taken every ' + intervalLabel(target.intervalMinutes) + '.';
-      return info;
+      status.text = 'Waiting for readings';
+      status.date = 'Every ' + intervalLabel(target.intervalMinutes).replace(/^1 /, '');
+      return status;
     }
 
-    if (full) {
-      info.chip = { kind: 'is-critical', icon: 'times-circle', text: 'Full' };
-      info.label = 'No free space left';
-      info.value = 'Full';
-      return info;
+    if (target.status === 'full') {
+      status.text = 'Full';
+      status.kind = 'is-critical';
+      status.icon = 'times-circle';
+      status.date = 'No free space left';
+      return status;
     }
 
     if (target.status === 'collecting') {
-      info.chip = { kind: 'is-neutral', icon: 'hourglass-half', text: 'Collecting' };
-      info.label = 'First forecast after 7 days of readings';
-      info.value = 'Collecting';
-      info.date = target.readings + ' readings over ' + formatDuration(target.time - target.firstReading) + ' so far.';
-      return info;
+      status.text = 'Collecting';
+      status.date = formatDuration(target.time - target.firstReading) + ' so far';
+      status.notes.push(['First forecast after 7 days of readings.', null]);
+      return status;
     }
 
     if (target.status === 'not-filling') {
-      info.label = 'Usage is flat or shrinking';
-      info.value = 'Not filling';
-      info.date = target.windowDays === 0 ? 'Across all its history.' : 'Over the last ' + windowLabel(target.windowDays) + '.';
-      return info;
+      status.text = 'Not filling';
+      status.date = target.windowDays === 0 ? 'across all history' : 'over the last ' + windowLabel(target.windowDays);
+      return status;
     }
 
-    info.label = 'Full in about';
-    info.value = formatDuration(target.secondsToFull);
-    info.date = 'around ' + formatDate(target.time + target.secondsToFull);
-    info.facts.push(['Likely range: ', rangeText(target)]);
-    return info;
+    status.text = 'Full in ' + formatDuration(target.secondsToFull);
+    status.date = 'around ' + formatDate(target.time + target.secondsToFull);
+    if (target.warning) {
+      status.kind = 'is-warning';
+      status.icon = 'exclamation-triangle';
+      status.notes.push(['Within your ' + warnLabel(target.warnDays).replace(' days', '-day').replace(' year', '-year') + ' warning window.', null]);
+    }
+    if (target.growthPerMonth > 0) {
+      status.notes.push(['Expected growth: ', formatRate(target.growthPerMonth)]);
+    }
+    if (!target.calibrated && target.windowDays > 0) {
+      status.notes.push(['Rough estimate until there are ' + Math.round((target.windowDays + 30) / 30.44) + ' months of readings.', null]);
+    }
+    return status;
+  }
+
+  /**
+   * One target as a row: name and time to full, a meter, and how much is used. The detailed
+   * row (Forecast page) adds the kind, the date, the likely range and notes.
+   *
+   * @param {object} target Target summary from the overview.
+   * @param {object} options tag ('a' or 'div'), href, detailed, selected.
+   */
+  function targetRow(target, options) {
+    var status = rowStatus(target);
+    var fraction = usedFraction(target);
+    var detailed = !!options.detailed;
+    var line = function (className, left, right) {
+      return el('div', { className: 'df-row-line ' + className }, [left, right]);
+    };
+
+    var children = [
+      line('',
+        el('strong', { className: 'df-row-name', text: target.name }),
+        el('span', { className: 'df-row-when df-num ' + status.kind }, [status.icon ? icon(status.icon) : null, status.icon ? ' ' : null, status.text]))
+    ];
+
+    if (detailed) {
+      children.push(line('df-row-sub', el('span', { text: target.description }), el('span', { className: 'df-num', text: status.date })));
+    }
+
+    if (target.size) {
+      children.push(el('div', {
+        className: 'df-meter ' + status.kind,
+        role: 'meter',
+        'aria-valuemin': 0,
+        'aria-valuemax': 100,
+        'aria-valuenow': Math.round(fraction * 100),
+        'aria-label': target.name + ' used'
+      }, [el('span', { style: 'width:' + (fraction * 100).toFixed(1) + '%' })]));
+      children.push(line('df-row-sub',
+        el('span', { className: 'df-num', text: formatBytes(target.used) + ' of ' + formatBytes(target.size) + (detailed ? ' · ' + Math.round(fraction * 100) + '%' : '') }),
+        detailed && target.status === 'filling' ? el('span', { className: 'df-num', text: 'Likely ' + rangeText(target) }) : null));
+    }
+
+    if (detailed) {
+      status.notes.forEach(function (note) {
+        children.push(el('div', { className: 'df-row-note' }, [note[0], note[1] ? el('strong', { className: 'df-num', text: note[1] }) : null]));
+      });
+    }
+
+    var attrs = { className: 'df-row' + (options.selected ? ' is-selected' : ''), 'data-id': target.id };
+    if (options.href) {
+      attrs.href = options.href;
+    }
+    return el(options.tag || 'div', attrs, children);
   }
 
   /** "1y 1mo – 3y 9mo"; anything past ten years reads as "over 10y". */
@@ -255,8 +296,8 @@
     intervalLabel: intervalLabel,
     windowLabel: windowLabel,
     warnLabel: warnLabel,
-    typeLabel: typeLabel,
-    describe: describe,
+    rowStatus: rowStatus,
+    targetRow: targetRow,
     rangeText: rangeText,
     usedFraction: usedFraction,
     DAY: DAY,

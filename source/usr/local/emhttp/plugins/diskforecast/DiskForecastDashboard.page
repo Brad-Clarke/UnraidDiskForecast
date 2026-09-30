@@ -14,11 +14,11 @@ $mytiles[$pluginname]['column2'] = <<<EOT
 <tbody id="db-diskforecast" title="Disk Forecast">
 <tr><td>
 <i class="fa fa-area-chart f32"></i><div class="section">Disk Forecast<br><span id="df-dash-sub">Loading…</span><br></div>
-<a href="/Settings/DiskForecast" title="Open Disk Forecast"><i class="fa fa-fw fa-cog control"></i></a>
+<a href="/Settings/DiskForecastSettings" title="Disk Forecast settings"><i class="fa fa-fw fa-cog control"></i></a>
 </td></tr>
 <tr><td>
 <link rel="stylesheet" href="{$dfCss}">
-<div id="df-dash" class="df-root df-dash" data-theme="{$dfTheme}" data-api="/plugins/diskforecast/api.php" data-link="/Settings/DiskForecast"></div>
+<div id="df-dash" class="df-root df-dash" data-theme="{$dfTheme}" data-api="/plugins/diskforecast/api.php" data-link="/Tools/DiskForecast"></div>
 <script src="{$dfCommon}"></script>
 <script src="{$dfScript}"></script>
 </td></tr>

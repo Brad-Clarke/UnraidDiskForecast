@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace DiskForecast\Config;
 
 use DiskForecast\Storage\Inventory;
-use DiskForecast\Storage\Platform;
-use DiskForecast\Storage\UnitKind;
 
 /**
  * Checks settings submitted from the settings page against the server's real storage.
@@ -16,10 +14,8 @@ final class SettingsInput
     private const MAX_TARGETS = 50;
     private const MAX_NAME = 60;
 
-    public function __construct(
-        private readonly Platform $platform,
-        private readonly Inventory $inventory,
-    ) {
+    public function __construct(private readonly Inventory $inventory)
+    {
     }
 
     /**
@@ -36,13 +32,6 @@ final class SettingsInput
         }
 
         $errors = [];
-        $dataDir = rtrim(trim((string) ($raw['dataDir'] ?? '')), '/');
-        $problem = $this->platform->dataDirProblem($dataDir);
-        if ($problem !== null) {
-            $errors[] = $problem;
-        }
-
-        $sharesEnabled = (bool) ($raw['sharesEnabled'] ?? false);
         $rawTargets = is_array($raw['targets'] ?? null) ? array_values($raw['targets']) : [];
         if (count($rawTargets) > self::MAX_TARGETS) {
             $errors[] = 'You can track up to ' . self::MAX_TARGETS . ' targets.';
@@ -52,7 +41,7 @@ final class SettingsInput
         $targets = [];
         $usedIds = [];
         foreach ($rawTargets as $index => $rawTarget) {
-            [$target, $targetErrors] = $this->parseTarget($rawTarget, $index + 1, $sharesEnabled, $current, $usedIds);
+            [$target, $targetErrors] = $this->parseTarget($rawTarget, $index + 1, $current, $usedIds);
             array_push($errors, ...$targetErrors);
             if ($target !== null) {
                 $targets[] = $target;
@@ -60,14 +49,14 @@ final class SettingsInput
             }
         }
 
-        return $errors === [] ? [new Settings($dataDir, $sharesEnabled, $targets), []] : [null, $errors];
+        return $errors === [] ? [new Settings($targets), []] : [null, $errors];
     }
 
     /**
      * @param array<string, true> $usedIds
      * @return array{0: Target|null, 1: list<string>}
      */
-    private function parseTarget(mixed $raw, int $position, bool $sharesEnabled, Settings $current, array $usedIds): array
+    private function parseTarget(mixed $raw, int $position, Settings $current, array $usedIds): array
     {
         if (!is_array($raw)) {
             return [null, ["Target {$position} could not be read."]];
@@ -86,8 +75,6 @@ final class SettingsInput
         $members = array_values(array_unique(array_map('strval', is_array($raw['members'] ?? null) ? $raw['members'] : [])));
         if ($type === null) {
             $errors[] = "{$label}: choose what to track.";
-        } elseif ($type === TargetType::Share && !$sharesEnabled) {
-            $errors[] = "{$label}: share targets are turned off. Turn on \"Allow share targets\" or remove it.";
         } else {
             $memberError = $this->memberError($type, $members);
             if ($memberError !== null) {
@@ -130,10 +117,6 @@ final class SettingsInput
         switch ($type) {
             case TargetType::Array:
                 return null;
-            case TargetType::Pool:
-                $unit = count($members) === 1 ? $this->inventory->unit($members[0]) : null;
-
-                return $unit !== null && $unit->kind === UnitKind::Pool ? null : 'choose a pool.';
             case TargetType::Disks:
                 if ($members === []) {
                     return 'choose at least one disk or pool.';

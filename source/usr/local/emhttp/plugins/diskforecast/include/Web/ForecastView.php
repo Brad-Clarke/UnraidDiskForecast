@@ -31,9 +31,10 @@ final class ForecastView
     /**
      * The headline numbers for one target.
      *
+     * @param string $description What the target measures, such as "Whole array" or "Pool · cache".
      * @return array<string, mixed>
      */
-    public static function summary(Target $target, TargetForecast $result): array
+    public static function summary(Target $target, TargetForecast $result, string $description): array
     {
         $forecast = $result->forecast;
         $latest = $forecast->latest;
@@ -41,8 +42,7 @@ final class ForecastView
         return [
             'id' => $target->id,
             'name' => $target->name,
-            'type' => $target->type->value,
-            'members' => $target->members,
+            'description' => $description,
             'intervalMinutes' => $target->intervalMinutes,
             'windowDays' => $target->windowDays,
             'warnDays' => $target->warnDays,
@@ -55,22 +55,7 @@ final class ForecastView
             'size' => $latest?->size,
             'used' => $latest?->used,
             'free' => $latest?->free,
-            'growthPerMonth' => $forecast->projection(self::MONTH) === null ? null : $forecast->projection(self::MONTH)[0] - $forecast->startUsed,
-            'secondsToFull' => $forecast->secondsToFull,
-            'earliestSeconds' => $forecast->earliestSeconds,
-            'latestSeconds' => $forecast->latestSeconds,
-        ];
-    }
-
-    /**
-     * Only the projected times, for "what if I add a drive".
-     *
-     * @return array<string, mixed>
-     */
-    public static function times(Forecast $forecast): array
-    {
-        return [
-            'status' => $forecast->status->value,
+            'growthPerMonth' => $forecast->secondsToFull > 0 ? $forecast->room / $forecast->secondsToFull * self::MONTH : null,
             'secondsToFull' => $forecast->secondsToFull,
             'earliestSeconds' => $forecast->earliestSeconds,
             'latestSeconds' => $forecast->latestSeconds,
@@ -79,16 +64,23 @@ final class ForecastView
 
     /**
      * The graph for one target: history over the span, the projection ahead, capacity,
-     * and a table of projected usage at fixed horizons.
+     * a table of projected usage at fixed horizons, and the projected times.
      *
      * @param int $spanDays Days of history to show; 0 for all of it.
+     * @param float $addedBytes Capacity pretended to be added now ("what if I add a drive"); the forecast already includes it.
      * @return array<string, mixed>
      */
-    public static function series(History $history, Forecast $forecast, int $spanDays): array
+    public static function series(History $history, Forecast $forecast, int $spanDays, float $addedBytes = 0.0): array
     {
         $latest = $forecast->latest;
+        $times = [
+            'status' => $forecast->status->value,
+            'secondsToFull' => $forecast->secondsToFull,
+            'earliestSeconds' => $forecast->earliestSeconds,
+            'latestSeconds' => $forecast->latestSeconds,
+        ];
         if ($latest === null) {
-            return ['history' => [], 'projection' => [], 'milestones' => [], 'capacity' => null, 'now' => $forecast->time];
+            return ['history' => [], 'projection' => [], 'milestones' => [], 'capacity' => null, 'baseCapacity' => null, 'now' => $forecast->time, 'times' => $times];
         }
 
         $now = $forecast->time;
@@ -99,7 +91,12 @@ final class ForecastView
             $historyRows[] = [(int) round($points->origin + $offset), (int) round($points->values[$i])];
         }
 
-        $capacity = (float) $latest->size;
+        $last = end($historyRows);
+        if ($last !== false && $last[0] < $latest->time) {
+            $historyRows[] = [$latest->time, $latest->used];
+        }
+
+        $capacity = $latest->size + $addedBytes;
         $projection = [];
         $milestones = [];
         if ($forecast->trend !== null) {
@@ -131,8 +128,10 @@ final class ForecastView
             'history' => $historyRows,
             'projection' => $projection,
             'milestones' => $milestones,
-            'capacity' => $latest->size,
+            'capacity' => (int) round($capacity),
+            'baseCapacity' => $latest->size,
             'now' => $now,
+            'times' => $times,
         ];
     }
 

@@ -7,8 +7,9 @@ declare(strict_types=1);
  *
  *   php -S localhost:8080 dev/preview.php
  *
- * Then open http://localhost:8080/ . Add ?theme=white, black, azure or gray to switch
- * Unraid theme; /Dashboard shows the dashboard tile; /reset rebuilds the fake data.
+ * Then open http://localhost:8080/ (the Forecast page, /Tools/DiskForecast). Settings are at
+ * /Settings/DiskForecastSettings and the dashboard tile at /Dashboard. Add ?theme=white,
+ * black, azure or gray to switch Unraid theme; /reset rebuilds the fake data.
  */
 
 require __DIR__ . '/bootstrap.php';
@@ -95,27 +96,22 @@ $palette = [
     'gray' => ['#121510', '#f2f2f2', '#1c1f1a', '#34372f'],
 ][$theme];
 [$background, $text, $bar, $line] = $palette;
-$isDashboard = $path === '/Dashboard';
 $themeLinks = implode(' ', array_map(
     static fn (string $t): string => $t === $theme ? "<strong>{$t}</strong>" : "<a href=\"?theme={$t}\">{$t}</a>",
     $themes,
 ));
 
-$content = '';
-if ($isDashboard) {
+if ($path === '/Dashboard') {
+    $heading = 'Dashboard';
     $mytiles = [];
     renderPage("{$pluginRoot}/DiskForecastDashboard.page", $theme, $pluginRoot, $mytiles);
     $content = '<table class="dash-tile">' . $mytiles['diskforecast']['column2'] . '</table>';
+} elseif ($path === '/Settings/DiskForecastSettings') {
+    $heading = 'Settings › User Utilities › Disk Forecast';
+    $content = renderPage("{$pluginRoot}/DiskForecastSettings.page", $theme, $pluginRoot);
 } else {
-    $tabs = [
-        'tab1' => ['Forecast', "{$pluginRoot}/DiskForecastOverview.page"],
-        'tab2' => ['Settings', "{$pluginRoot}/DiskForecastSettings.page"],
-    ];
-    foreach ($tabs as $id => [$title, $file]) {
-        $checked = $id === 'tab' . ($_GET['tab'] ?? '1') ? ' checked' : '';
-        $content .= "<div class=\"tab\"><input type=\"radio\" id=\"{$id}\" name=\"tabs\"{$checked}><label for=\"{$id}\">{$title}</label>"
-            . '<div class="content">' . renderPage($file, $theme, $pluginRoot) . '</div></div>';
-    }
+    $heading = 'Tools › Disk Utilities › Disk Forecast';
+    $content = renderPage("{$pluginRoot}/DiskForecast.page", $theme, $pluginRoot);
 }
 ?>
 <!DOCTYPE html>
@@ -136,13 +132,6 @@ if ($isDashboard) {
   .shell-header .themes a { margin-left: 6px; }
   main { max-width: 1280px; margin: 0 auto; padding: 18px 16px 48px; }
   h1 { margin: 0 0 14px; font-size: 1.8rem; font-weight: 600; }
-  .tab { display: contents; }
-  .tab > input { position: absolute; opacity: 0; pointer-events: none; }
-  .tab > label { display: inline-block; margin: 0 4px 14px 0; padding: 6px 14px; border: 1px solid <?= $line ?>; border-radius: 6px; cursor: pointer; font-weight: 600; }
-  .tab > input:checked + label { background: <?= $bar ?>; border-color: #ff8c2f; }
-  .tab > .content { display: none; order: 99; width: 100%; min-width: 0; }
-  .tab > input:checked + label + .content { display: block; }
-  .tabs { display: flex; flex-wrap: wrap; align-items: flex-start; }
   .dash-tile { width: 380px; border-collapse: collapse; background: <?= $bar ?>; border: 1px solid <?= $line ?>; }
   .dash-tile td { padding: 10px 14px; }
   .dash-tile .f32 { float: left; margin-right: 10px; font-size: 32px; }
@@ -154,12 +143,12 @@ if ($isDashboard) {
 <body>
 <header class="shell-header">
   <span class="logo">UNRAID</span>
-  <nav><a href="/Dashboard">Dashboard</a><a href="/Settings/DiskForecast">Settings › Disk Forecast</a></nav>
+  <nav><a href="/Dashboard">Dashboard</a><a href="/Tools/DiskForecast">Tools › Disk Forecast</a><a href="/Settings/DiskForecastSettings">Settings › Disk Forecast</a></nav>
   <span class="themes">Theme: <?= $themeLinks ?> · <a href="/reset">reset data</a></span>
 </header>
 <main>
-  <h1><?= $isDashboard ? 'Dashboard' : 'Disk Forecast' ?></h1>
-  <div class="tabs"><?= $content ?></div>
+  <h1><?= $heading ?></h1>
+  <?= $content ?>
 </main>
 </body>
 </html>

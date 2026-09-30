@@ -16,7 +16,7 @@ use DiskForecast\Logging\Logger;
 final class ForecastService
 {
     /** Bumped whenever the forecast maths changes, so old cached results are ignored. */
-    private const CACHE_VERSION = 2;
+    private const CACHE_VERSION = 7;
 
     public function __construct(
         private readonly HistoryStore $store,

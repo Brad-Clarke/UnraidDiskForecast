@@ -29,6 +29,13 @@ final class FakePlatform implements Platform
         'nvme' => [UnitKind::Pool, 4 * self::TB, 0.06],
     ];
 
+    /**
+     * @param string $dataDir Local folder standing in for the server's readings folder.
+     */
+    public function __construct(private readonly string $dataDir)
+    {
+    }
+
     public function units(): array
     {
         $units = [];
@@ -61,13 +68,8 @@ final class FakePlatform implements Platform
         return true;
     }
 
-    public function dataDirProblem(string $path): ?string
+    public function dataDir(): string
     {
-        return $path === '' ? 'Choose a readings folder.' : null;
-    }
-
-    public function defaultDataDir(): string
-    {
-        return '/mnt/cache/appdata/diskforecast';
+        return $this->dataDir;
     }
 }

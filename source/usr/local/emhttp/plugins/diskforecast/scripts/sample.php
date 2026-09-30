@@ -34,7 +34,6 @@ foreach ($app->sampler()->run($now) as $line) {
     echo $line, "\n";
 }
 
-$settings = $app->settings();
-if ($app->platform()->pathAvailable($settings->dataDir)) {
-    $app->warningMonitor()->check($settings, $now);
+if ($app->dataDirAvailable()) {
+    $app->warningMonitor()->check($app->settings(), $now);
 }

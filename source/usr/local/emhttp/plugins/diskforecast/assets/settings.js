@@ -1,4 +1,4 @@
-/* Disk Forecast: the settings view (readings folder, shares switch, targets). */
+/* Disk Forecast: the settings view (what to track). */
 (function () {
   'use strict';
 
@@ -6,8 +6,7 @@
   var el = DF.el;
   var TYPES = [
     ['array', 'Whole array'],
-    ['pool', 'A pool'],
-    ['disks', 'Chosen disks or pools'],
+    ['disks', 'Disks or pools'],
     ['share', 'A share']
   ];
 
@@ -16,6 +15,7 @@
     this.api = root.getAttribute('data-api');
     this.csrf = root.getAttribute('data-csrf') || window.csrf_token || '';
     this.doneUrl = root.getAttribute('data-done-url');
+    this.forecastUrl = root.getAttribute('data-forecast-url');
     this.load();
   }
 
@@ -26,6 +26,8 @@
       self.inventory = data.inventory;
       self.options = data.options;
       self.saved = data.saved;
+      self.dataDir = data.dataDir;
+      self.history = data.history;
       self.state = JSON.parse(JSON.stringify(data.settings));
       self.original = JSON.stringify(data.settings);
       self.render();
@@ -49,51 +51,14 @@
       ]));
     }
 
-    children.push(self.readingsSection(), self.sharesSection(), self.targetsSection(), self.actions());
+    children.push(self.toolbar(), self.targetsSection(), self.actions());
     self.root.replaceChildren.apply(self.root, children);
   };
 
-  SettingsView.prototype.readingsSection = function () {
-    var self = this;
-    var id = 'df-data-dir';
-    return el('section', { className: 'df-section' }, [
-      el('h3', { text: 'Readings' }),
-      el('p', { text: 'Each reading is one short line added to a file in this folder.' }),
-      el('label', { className: 'df-field', for: id }, [
-        el('span', { text: 'Readings folder' }),
-        el('input', {
-          id: id,
-          type: 'text',
-          value: self.state.dataDir,
-          spellcheck: 'false',
-          oninput: function (event) { self.state.dataDir = event.target.value; }
-        }),
-        el('small', { text: 'Use a pool path such as /mnt/cache/appdata/diskforecast. A folder under /mnt/user or on an array disk can wake sleeping disks at every reading. Existing readings are not moved if you change this.' })
-      ])
-    ]);
-  };
-
-  SettingsView.prototype.sharesSection = function () {
-    var self = this;
-    return el('section', { className: 'df-section' }, [
-      el('h3', { text: 'Shares' }),
-      el('label', { className: 'df-check' }, [
-        el('input', {
-          type: 'checkbox',
-          checked: self.state.sharesEnabled,
-          onchange: function (event) {
-            self.state.sharesEnabled = event.target.checked;
-            self.render();
-          }
-        }),
-        'Allow share targets'
-      ]),
-      el('div', { className: 'df-explain' }, [
-        el('strong', { text: 'How share targets work. ' }),
-        'A share\'s forecast follows the free space on the disks and pools the share is allowed to use. ',
-        'Other shares on the same disks fill that space too, so the forecast answers "when will this share run out of room?", not "how much is this share growing?". ',
-        'Nothing reads your folders, so no disks are woken up.'
-      ])
+  SettingsView.prototype.toolbar = function () {
+    return el('div', { className: 'df-toolbar' }, [
+      el('span', { className: 'df-faint' }, ['Readings are kept in ', el('code', { text: this.dataDir }), '.']),
+      el('a', { className: 'df-button', href: this.forecastUrl }, [DF.icon('area-chart'), 'View forecast'])
     ]);
   };
 
@@ -117,8 +82,8 @@
           onclick: function () {
             self.state.targets.push({
               name: '',
-              type: self.inventory.pools.length ? 'pool' : 'array',
-              members: self.inventory.pools.length ? [self.inventory.pools[0].name] : [],
+              type: 'disks',
+              members: [],
               intervalMinutes: 60,
               windowDays: 180,
               warnDays: 0
@@ -146,9 +111,8 @@
       return el('label', { className: 'df-field', for: id }, [el('span', { text: label }), control, hint ? el('small', { text: hint }) : null]);
     };
 
-    var types = TYPES.map(function (type) {
-      var disabled = (type[0] === 'share' && !self.state.sharesEnabled) || (type[0] === 'pool' && !self.inventory.pools.length);
-      return [type[0], type[1] + (type[0] === 'share' && !self.state.sharesEnabled ? ' (turned off)' : ''), disabled && target.type !== type[0]];
+    var types = TYPES.filter(function (type) {
+      return type[0] !== 'share' || self.inventory.shares.length || target.type === 'share';
     });
 
     var grid = el('div', { className: 'df-target-grid' }, [
@@ -179,24 +143,73 @@
     return el('div', { className: 'df-target' }, [
       grid,
       self.membersEditor(target, prefix),
-      el('div', { className: 'df-target-foot' }, [
-        el('span', { className: 'df-faint', text: target.id ? '' : 'New: readings start after you press Apply.' }),
-        el('button', {
-          type: 'button',
-          className: 'df-button is-quiet',
-          onclick: function () {
-            self.state.targets.splice(index, 1);
-            self.render();
-          }
-        }, [DF.icon('trash'), 'Remove'])
-      ])
+      self.targetFoot(target, index)
     ]);
   };
 
-  SettingsView.prototype.defaultMembers = function (type) {
-    if (type === 'pool') {
-      return this.inventory.pools.length ? [this.inventory.pools[0].name] : [];
+  /** Readings already recorded for a saved target, or null when it has none. */
+  SettingsView.prototype.recorded = function (target) {
+    var history = target.id && this.history ? this.history[target.id] : null;
+    return history && history.readings > 0 ? history : null;
+  };
+
+  /** Remove button, or the warning that asks before a target's readings are deleted. */
+  SettingsView.prototype.targetFoot = function (target, index) {
+    var self = this;
+    var remove = function () {
+      self.state.targets.splice(index, 1);
+      self.render();
+    };
+    var recorded = self.recorded(target);
+
+    if (target.confirmRemove && recorded) {
+      return el('div', { className: 'df-target-foot df-confirm', role: 'alert' }, [
+        el('span', {}, [
+          DF.icon('exclamation-triangle'), ' ',
+          el('strong', { text: 'Remove ' + (target.name || 'this target') + '? ' }),
+          'Its ' + recorded.readings.toLocaleString() + ' readings since ' + DF.formatDate(recorded.firstReading) + ' will be deleted when you press Apply. This can\'t be undone.'
+        ]),
+        el('span', { className: 'df-actions' }, [
+          el('button', {
+            type: 'button',
+            className: 'df-button',
+            onclick: function () {
+              delete target.confirmRemove;
+              self.render();
+            }
+          }, ['Keep']),
+          el('button', { type: 'button', className: 'df-button is-danger', onclick: remove }, [DF.icon('trash'), 'Remove and delete readings'])
+        ])
+      ]);
     }
+
+    return el('div', { className: 'df-target-foot' }, [
+      el('span', { className: 'df-faint', text: target.id ? '' : 'New: readings start after you press Apply.' }),
+      el('button', {
+        type: 'button',
+        className: 'df-button is-quiet',
+        onclick: function () {
+          if (!recorded) {
+            remove();
+            return;
+          }
+          target.confirmRemove = true;
+          self.render();
+        }
+      }, [DF.icon('trash'), 'Remove'])
+    ]);
+  };
+
+  /** Saved targets that are no longer in the list, and whose readings Apply would delete. */
+  SettingsView.prototype.pendingDeletes = function () {
+    var self = this;
+    var kept = self.state.targets.map(function (t) { return t.id; });
+    return JSON.parse(self.original).targets.filter(function (t) {
+      return kept.indexOf(t.id) === -1 && self.recorded(t);
+    });
+  };
+
+  SettingsView.prototype.defaultMembers = function (type) {
     if (type === 'share') {
       return this.inventory.shares.length ? [this.inventory.shares[0].name] : [];
     }
@@ -212,18 +225,6 @@
     if (target.type === 'array') {
       var total = self.inventory.disks.reduce(function (sum, d) { return sum + (d.size || 0); }, 0);
       return el('div', { className: 'df-target-members df-faint', text: 'All ' + self.inventory.disks.length + ' data disks added together (' + DF.formatBytes(total) + '). Parity is not counted.' });
-    }
-
-    if (target.type === 'pool') {
-      var poolId = prefix + 'pool';
-      return el('div', { className: 'df-target-members' }, [
-        el('label', { className: 'df-field', for: poolId, style: 'max-width:320px' }, [
-          el('span', { text: 'Pool' }),
-          el('select', { id: poolId, onchange: function (event) { target.members = [event.target.value]; } }, self.inventory.pools.map(function (pool) {
-            return el('option', { value: pool.name, selected: target.members[0] === pool.name, text: pool.name + ' (' + sizeText(pool) + ')' });
-          }))
-        ])
-      ]);
     }
 
     if (target.type === 'share') {
@@ -242,7 +243,8 @@
             return el('option', { value: share.name, selected: target.members[0] === share.name, text: share.name });
           }))
         ]),
-        current ? el('p', { className: 'df-faint', style: 'margin:6px 0 0', text: current.units.length ? 'Can use: ' + current.units.join(', ') + '.' : 'This share has no disks or pools it can use.' }) : null
+        current ? el('p', { className: 'df-faint', style: 'margin:6px 0 0', text: current.units.length ? 'Can use: ' + current.units.join(', ') + '.' : 'This share has no disks or pools it can use.' }) : null,
+        el('p', { className: 'df-explain', text: 'This tracks the free space on the disks and pools the share can use. Other shares on those disks take from the same space, so it shows when the share will run out of room, not how big the share is.' })
       ]);
     }
 
@@ -282,8 +284,17 @@
           self.saved = true;
           self.state = JSON.parse(JSON.stringify(data.settings));
           self.original = JSON.stringify(data.settings);
-          self.render(el('div', { className: 'df-notice' }, [DF.icon('check'), el('div', { text: 'Saved. Changes to readings take effect at the next reading.' })]));
-          document.dispatchEvent(new CustomEvent('diskforecast:saved'));
+          var lines = ['Saved. Changes to readings take effect at the next reading.'];
+          if (data.deleted.length) {
+            lines.push('Deleted the readings of ' + data.deleted.join(', ') + '.');
+          }
+          if (data.notDeleted.length) {
+            lines.push('Could not delete the readings of ' + data.notDeleted.join(', ') + ' (is the array stopped?). They are still in ' + self.dataDir + '/history.');
+          }
+          self.render(el('div', { className: 'df-notice' + (data.notDeleted.length ? ' is-warning' : '') }, [
+            DF.icon(data.notDeleted.length ? 'exclamation-triangle' : 'check'),
+            el('div', {}, lines.map(function (line) { return el('div', { text: line }); }))
+          ]));
         }).catch(function (error) {
           var errors = (error.body && error.body.errors) || [error.message];
           apply.disabled = false;
@@ -296,7 +307,12 @@
       }
     }, ['Apply']);
 
+    var pending = self.pendingDeletes();
     return el('div', { className: 'df-actions' }, [
+      pending.length ? el('div', { className: 'df-notice is-warning', style: 'flex-basis:100%;margin:0' }, [
+        DF.icon('exclamation-triangle'),
+        el('div', { text: 'Apply will delete the readings of ' + pending.map(function (t) { return t.name; }).join(', ') + '. Press Reset to keep them.' })
+      ]) : null,
       apply,
       el('button', {
         type: 'button',

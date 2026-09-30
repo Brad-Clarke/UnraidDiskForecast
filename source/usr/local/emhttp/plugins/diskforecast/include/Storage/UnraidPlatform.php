@@ -146,25 +146,12 @@ final class UnraidPlatform implements Platform
         return $this->isMounted($match[1]);
     }
 
-    public function dataDirProblem(string $path): ?string
-    {
-        if (preg_match('#^/mnt/[A-Za-z0-9_.-]+(/[A-Za-z0-9 _.-]+)+$#', $path) !== 1) {
-            return 'The readings folder must be a folder under /mnt, such as /mnt/user/appdata/diskforecast.';
-        }
-
-        if (preg_match('#/\.\.?(/|$)#', $path) === 1) {
-            return 'The readings folder cannot contain "." or ".." parts.';
-        }
-
-        return null;
-    }
-
     /**
      * The appdata folder on a pool, addressed directly (/mnt/cache/appdata/diskforecast):
      * going through /mnt/user makes the share filesystem look on array disks too, which
      * can wake them. Falls back to /mnt/user when no pool holds appdata.
      */
-    public function defaultDataDir(): string
+    public function dataDir(): string
     {
         foreach ($this->units() as $unit) {
             if ($unit->kind === UnitKind::Pool && $this->isMounted($unit->mount) && is_dir("{$unit->mount}/appdata")) {

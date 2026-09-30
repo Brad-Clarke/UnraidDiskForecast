@@ -33,11 +33,11 @@ $root = sys_get_temp_dir() . '/diskforecast-smoke-' . getmypid();
 $logger = new ConsoleLogger();
 $notifier = new ConsoleNotifier();
 $store = new SettingsStore("{$root}/settings.json", $logger);
-$store->save(new Settings("{$root}/data", true, [
+$store->save(new Settings([
     new Target('array', 'Array', TargetType::Array, [], 60, 180, 3650),
     new Target('media', 'Media', TargetType::Share, ['Media'], 15, 30, 0),
 ]));
-$app = new Composition(new FakePlatform(), $store, "{$root}/cache", $logger, $notifier);
+$app = new Composition(new FakePlatform("{$root}/data"), $store, "{$root}/cache", $logger, $notifier);
 
 $now = 1_800_000_000;
 $report = $app->sampler()->run($now);
@@ -85,7 +85,7 @@ $check(($shares['Backups'] ?? '') === 'disk2,disk3', 'Backups: all disks minus e
 $check(($shares['fast'] ?? '') === 'cache,nvme', 'fast: pool with a secondary pool, no array (' . ($shares['fast'] ?? '-') . ')');
 $check($unraid->pathAvailable('/mnt/cache/appdata/diskforecast'), 'a folder on a mounted pool is available');
 $check(!$unraid->pathAvailable('/mnt/user/appdata/diskforecast'), 'a folder under an unmounted /mnt/user is not');
-$check($unraid->dataDirProblem('/boot/config/x') !== null && $unraid->dataDirProblem('/mnt/cache/appdata/diskforecast') === null, 'readings folder must be under /mnt');
+$check($unraid->dataDir() === '/mnt/user/appdata/diskforecast', 'with no appdata folder on a pool, readings go to /mnt/user/appdata');
 
 $remove = static function (string $dir) use (&$remove): void {
     foreach (glob("{$dir}/*") ?: [] as $entry) {

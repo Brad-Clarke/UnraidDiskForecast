@@ -15,7 +15,7 @@
         author="&author;"
         version="&version;"
         pluginURL="&pluginURL;"
-        launch="Settings/DiskForecast"
+        launch="Tools/DiskForecast"
         icon="area-chart"
         min="6.12.0">
 
@@ -39,7 +39,7 @@ EOF
 /usr/local/sbin/update_cron
 find &config; -maxdepth 1 -name '&name;-*.txz' ! -name '&package;.txz' -delete
 echo ""
-echo "Disk Forecast &version; is installed. Open Settings > Disk Forecast."
+echo "Disk Forecast &version; is installed. Forecasts: Tools > Disk Forecast. Settings: Settings > Disk Forecast."
 echo ""
 </INLINE>
 </FILE>

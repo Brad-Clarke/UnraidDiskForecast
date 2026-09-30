@@ -22,7 +22,7 @@ final class PreviewComposition
         $logger = new ConsoleLogger();
 
         return new Composition(
-            new FakePlatform(),
+            new FakePlatform("{$root}/data"),
             new SettingsStore("{$root}/settings.json", $logger),
             "{$root}/cache",
             $logger,

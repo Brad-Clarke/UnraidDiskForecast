@@ -58,8 +58,8 @@ final class Forecast
     }
 
     /**
-     * Projected bytes used after the given number of seconds: estimate, slow case, fast case.
-     * Null when there is no trend.
+     * Projected bytes used after the given number of seconds: estimate, slow case, fast case,
+     * never below zero. Null when there is no trend.
      *
      * @return array{0: float, 1: float, 2: float}|null
      */
@@ -72,9 +72,9 @@ final class Forecast
         [$slow, $fast] = $this->range->bounds($seconds);
 
         return [
-            $this->startUsed + $this->range->estimate($seconds),
-            $this->startUsed + $slow,
-            $this->startUsed + $fast,
+            max(0.0, $this->startUsed + $this->range->estimate($seconds)),
+            max(0.0, $this->startUsed + $slow),
+            max(0.0, $this->startUsed + $fast),
         ];
     }
 }

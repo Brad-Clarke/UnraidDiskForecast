@@ -64,7 +64,7 @@ final class Inventory
     {
         $names = match ($target->type) {
             TargetType::Array => array_keys(array_filter($this->units, static fn (StorageUnit $u): bool => $u->kind === UnitKind::Disk)),
-            TargetType::Pool, TargetType::Disks => $target->members,
+            TargetType::Disks => $target->members,
             TargetType::Share => $this->share($target->members[0] ?? '')?->units ?? [],
         };
 

@@ -1,21 +1,22 @@
-/* Disk Forecast: the forecast view (cards, graph, projection table). */
+/* Disk Forecast: the forecast page (target list, graph, projection table, what-if drive). */
 (function () {
   'use strict';
 
   var DF = window.DiskForecast;
   var el = DF.el;
   var SPANS = [[30, '30D'], [90, '90D'], [365, '1Y'], [0, 'All']];
+  var DRIVE_SIZES = [8, 12, 16, 20, 24, 28];
 
   function ForecastView(root) {
     this.root = root;
     this.api = root.getAttribute('data-api');
     this.settingsUrl = root.getAttribute('data-settings-url');
     this.targets = [];
-    this.selected = null;
+    this.selected = new URLSearchParams(window.location.search).get('target');
     this.span = 365;
+    this.addTb = 0;
     this.chart = null;
     this.load();
-    document.addEventListener('diskforecast:saved', this.load.bind(this));
   }
 
   ForecastView.prototype.load = function () {
@@ -33,22 +34,6 @@
         DF.icon('exclamation-circle'),
         el('div', {}, [el('strong', { text: 'Could not load the forecasts. ' }), error.message])
       ]));
-    });
-  };
-
-  /** A link to the Settings tab: switches tab in place when the tabs are on this page. */
-  ForecastView.prototype.settingsLink = function (text) {
-    var self = this;
-    return el('a', {
-      href: self.settingsUrl,
-      text: text,
-      onclick: function (event) {
-        var tab = document.getElementById('tab2');
-        if (tab && tab.type === 'radio') {
-          event.preventDefault();
-          tab.click();
-        }
-      }
     });
   };
 
@@ -75,7 +60,7 @@
         DF.icon('info-circle'),
         el('div', {}, [
           'Tracking the array and each pool with the default settings. ',
-          self.settingsLink('Choose what to track'),
+          el('a', { href: self.settingsUrl, text: 'Choose what to track' }),
           ' to add disks or shares, change how often readings are taken, or get a warning before something fills.'
         ])
       ]));
@@ -84,125 +69,46 @@
     if (!self.targets.length) {
       children.push(el('div', { className: 'df-panel df-empty' }, [
         'Nothing is being tracked. ',
-        self.settingsLink('Add a target in Settings'),
+        el('a', { href: self.settingsUrl, text: 'Add a target in Settings' }),
         '.'
       ]));
       self.root.replaceChildren.apply(self.root, children);
       return;
     }
 
-    self.cards = el('div', { className: 'df-cards' }, self.targets.map(function (t) { return self.card(t); }));
-    self.panel = el('section', { className: 'df-panel', 'aria-live': 'polite' });
-    children.push(self.cards, self.panel);
+    self.list = el('div', { className: 'df-list', role: 'listbox', 'aria-label': 'Targets' }, self.targets.map(function (target) {
+      return self.row(target);
+    }));
+    self.panel = el('section', { className: 'df-panel' });
+    self.whatIfPanel = el('section', { className: 'df-panel' });
+    children.push(el('div', { className: 'df-layout' }, [
+      el('section', { className: 'df-panel df-list-panel' }, [
+        el('div', { className: 'df-panel-head df-list-head' }, [
+          el('h3', { className: 'df-panel-title', text: 'Targets' }),
+          el('a', { className: 'df-button is-quiet is-small', href: self.settingsUrl, title: 'Choose what to track' }, [DF.icon('cog'), 'Settings'])
+        ]),
+        self.list
+      ]),
+      el('div', { className: 'df-main' }, [self.panel, self.whatIfPanel])
+    ]));
     self.root.replaceChildren.apply(self.root, children);
-    self.renderPanel();
+    self.renderSelection();
   };
 
-  ForecastView.prototype.card = function (target) {
+  ForecastView.prototype.row = function (target) {
     var self = this;
-    var info = DF.describe(target);
-    var fraction = DF.usedFraction(target);
-
-    var head = el('div', { className: 'df-card-head' }, [
-      el('div', { style: 'min-width:0' }, [
-        el('h3', { className: 'df-card-title', text: target.name }),
-        el('div', { className: 'df-card-kind', text: DF.typeLabel(target) })
-      ]),
-      info.chip ? el('span', { className: 'df-chip ' + info.chip.kind }, [DF.icon(info.chip.icon), info.chip.text]) : null
-    ]);
-
-    var usage = target.size ? el('div', { className: 'df-usage' }, [
-      el('div', { className: 'df-usage-text df-num' }, [
-        el('span', {}, [el('strong', { text: DF.formatBytes(target.used) }), ' of ' + DF.formatBytes(target.size) + ' used']),
-        el('span', { text: Math.round(fraction * 100) + '%' })
-      ]),
-      el('div', {
-        className: 'df-meter ' + info.meter,
-        role: 'meter',
-        'aria-valuemin': 0,
-        'aria-valuemax': 100,
-        'aria-valuenow': Math.round(fraction * 100),
-        'aria-label': target.name + ' used'
-      }, [el('span', { style: 'width:' + (fraction * 100).toFixed(1) + '%' })])
-    ]) : null;
-
-    var headline = el('div', { className: 'df-headline' }, [
-      el('span', { className: 'df-headline-label', text: info.label }),
-      el('span', { className: 'df-headline-value df-num', text: info.value }),
-      info.date ? el('span', { className: 'df-headline-date', text: info.date }) : null
-    ]);
-
-    var facts = info.facts.map(function (fact) {
-      return el('div', {}, [fact[0], el('strong', { className: 'df-num', text: fact[1] })]);
-    });
-    if (target.status === 'filling' && target.growthPerMonth > 0) {
-      facts.push(el('div', {}, ['Growing about ', el('strong', { className: 'df-num', text: DF.formatRate(target.growthPerMonth) })]));
-    }
-    if (target.status === 'filling' && !target.calibrated) {
-      facts.push(el('div', { className: 'df-faint', text: 'Early estimate: it sharpens once there is more history.' }));
-    }
-
-    var card = el('article', {
-      className: 'df-card' + (target.id === self.selected ? ' is-selected' : ''),
-      tabindex: 0,
-      'aria-pressed': target.id === self.selected ? 'true' : 'false',
-      'data-id': target.id,
-      onclick: function () { self.select(target.id); },
-      onkeydown: function (event) {
-        if ((event.key === 'Enter' || event.key === ' ') && event.target === card) {
-          event.preventDefault();
-          self.select(target.id);
-        }
-      }
-    }, [head, usage, headline, facts.length ? el('div', { className: 'df-facts' }, facts) : null]);
-
-    if (target.status === 'filling' || target.status === 'full') {
-      card.appendChild(self.whatIf(target));
-    }
-    return card;
-  };
-
-  ForecastView.prototype.whatIf = function (target) {
-    var self = this;
-    var result = el('div', { className: 'df-whatif-result df-num', 'aria-live': 'polite' });
-    var timer = null;
-    var inputId = 'df-whatif-' + target.id;
-    var input = el('input', {
-      id: inputId,
-      type: 'number',
-      min: '0.5',
-      max: '10000',
-      step: '0.5',
-      placeholder: '20',
-      inputmode: 'decimal',
-      oninput: function () {
-        clearTimeout(timer);
-        var tb = parseFloat(input.value);
-        if (!(tb > 0)) {
-          result.textContent = '';
-          return;
-        }
-        result.textContent = 'Working it out…';
-        timer = setTimeout(function () {
-          DF.getJson(self.api, { action: 'whatif', target: target.id, addTb: tb }).then(function (times) {
-            if (String(tb) !== String(parseFloat(input.value))) {
-              return;
-            }
-            result.textContent = times.secondsToFull === null
-              ? 'Would not fill at the current rate.'
-              : 'Full in about ' + DF.formatDuration(times.secondsToFull) + ' (' + DF.rangeText(times) + ').';
-          }).catch(function (error) {
-            result.textContent = error.message;
-          });
-        }, 350);
+    var row = DF.targetRow(target, { detailed: true, selected: target.id === self.selected });
+    row.setAttribute('role', 'option');
+    row.setAttribute('tabindex', '0');
+    row.setAttribute('aria-selected', target.id === self.selected ? 'true' : 'false');
+    row.addEventListener('click', function () { self.select(target.id); });
+    row.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        self.select(target.id);
       }
     });
-
-    return el('div', {
-      className: 'df-whatif',
-      onclick: function (event) { event.stopPropagation(); },
-      onkeydown: function (event) { event.stopPropagation(); }
-    }, [el('label', { for: inputId, text: 'If I add' }), input, el('span', { text: 'TB' }), result]);
+    return row;
   };
 
   ForecastView.prototype.select = function (id) {
@@ -210,20 +116,23 @@
       return;
     }
     this.selected = id;
-    Array.prototype.forEach.call(this.cards.children, function (card) {
-      var on = card.getAttribute('data-id') === id;
-      card.classList.toggle('is-selected', on);
-      card.setAttribute('aria-pressed', on ? 'true' : 'false');
+    Array.prototype.forEach.call(this.list.children, function (row) {
+      var on = row.getAttribute('data-id') === id;
+      row.classList.toggle('is-selected', on);
+      row.setAttribute('aria-selected', on ? 'true' : 'false');
     });
+    this.renderSelection();
+  };
+
+  ForecastView.prototype.renderSelection = function () {
     this.renderPanel();
+    this.renderWhatIf();
+    this.loadSeries();
   };
 
   ForecastView.prototype.renderPanel = function () {
     var self = this;
     var target = self.find(self.selected);
-    if (!target) {
-      return;
-    }
 
     var segmented = el('div', { className: 'df-segmented', role: 'group', 'aria-label': 'History shown' }, SPANS.map(function (span) {
       return el('button', {
@@ -232,42 +141,162 @@
         text: span[1],
         onclick: function () {
           self.span = span[0];
-          self.renderPanel();
+          Array.prototype.forEach.call(segmented.children, function (button, index) {
+            button.setAttribute('aria-pressed', SPANS[index][0] === self.span ? 'true' : 'false');
+          });
+          self.loadSeries();
         }
       });
     }));
 
-    var legend = el('ul', { className: 'df-legend' }, [
-      el('li', {}, [el('span', { className: 'df-key' }), 'Used']),
-      el('li', {}, [el('span', { className: 'df-key is-dashed' }), 'Estimate']),
-      el('li', {}, [el('span', { className: 'df-key is-band' }), 'Likely range']),
-      el('li', {}, [el('span', { className: 'df-key is-capacity' }), 'Capacity'])
-    ]);
-
-    var canvasHolder = el('div', { className: 'df-chart' }, [el('div', { className: 'df-empty', text: 'Loading the graph…' })]);
-    var table = el('div');
+    self.legend = el('ul', { className: 'df-legend' });
+    self.chartHolder = el('div', { className: 'df-chart' }, [el('div', { className: 'df-empty', text: 'Loading the graph…' })]);
+    self.tableHolder = el('div');
     self.panel.replaceChildren(
       el('div', { className: 'df-panel-head' }, [el('h3', { className: 'df-panel-title', text: target.name + ': usage and forecast' }), segmented]),
-      legend,
-      canvasHolder,
-      table
+      self.legend,
+      self.chartHolder,
+      self.tableHolder
     );
+  };
 
-    var requested = self.selected + '|' + self.span;
+  ForecastView.prototype.renderLegend = function (series) {
+    var projected = series.projection.length > 0;
+    var items = [
+      el('li', {}, [el('span', { className: 'df-key' }), 'Used']),
+      projected ? el('li', {}, [el('span', { className: 'df-key is-dashed' }), 'Estimate']) : null,
+      projected ? el('li', {}, [el('span', { className: 'df-key is-band' }), 'Likely range']) : null,
+      el('li', {}, [el('span', { className: 'df-key is-capacity' }), 'Capacity'])
+    ].filter(Boolean);
+    if (series.capacity !== series.baseCapacity) {
+      items.push(el('li', {}, [el('span', { className: 'df-key is-capacity is-dashed' }), 'With ' + this.addTb + ' TB added']));
+    }
+    this.legend.replaceChildren.apply(this.legend, items);
+  };
+
+  ForecastView.prototype.loadSeries = function () {
+    var self = this;
+    var target = self.find(self.selected);
+    var addTb = self.addTb;
+    var requested = [self.selected, self.span, addTb].join('|');
     self.pending = requested;
-    DF.getJson(self.api, { action: 'series', target: target.id, span: self.span }).then(function (series) {
+    DF.getJson(self.api, { action: 'series', target: target.id, span: self.span, addTb: addTb }).then(function (series) {
       if (self.pending !== requested) {
         return;
       }
+      self.showWhatIfResult(target, addTb, series.times, series.capacity);
       if (!series.history.length) {
-        canvasHolder.replaceChildren(el('div', { className: 'df-empty', text: 'No readings yet. The graph appears after the first few readings.' }));
+        self.legend.replaceChildren();
+        self.chartHolder.replaceChildren(el('div', { className: 'df-empty', text: 'No readings yet. The graph appears after the first few readings.' }));
+        self.tableHolder.replaceChildren();
         return;
       }
-      self.drawChart(canvasHolder, series);
-      table.replaceChildren(self.table(series));
+      self.renderLegend(series);
+      self.drawChart(self.chartHolder, series);
+      self.tableHolder.replaceChildren(self.table(series));
     }).catch(function (error) {
-      canvasHolder.replaceChildren(el('div', { className: 'df-notice is-error', text: error.message }));
+      self.chartHolder.replaceChildren(el('div', { className: 'df-notice is-error', text: error.message }));
     });
+  };
+
+  /** The "what if I add a drive" card, for whichever target is selected. */
+  ForecastView.prototype.renderWhatIf = function () {
+    var self = this;
+    var target = self.find(self.selected);
+    var head = el('div', { className: 'df-panel-head' }, [el('h3', { className: 'df-panel-title', text: 'What if I add a drive to ' + target.name + '?' })]);
+
+    var custom = el('input', {
+      id: 'df-whatif-custom',
+      type: 'number',
+      min: '1',
+      max: '10000',
+      step: '1',
+      placeholder: 'Other',
+      inputmode: 'decimal',
+      value: DRIVE_SIZES.indexOf(self.addTb) === -1 && self.addTb > 0 ? String(self.addTb) : null
+    });
+    var timer = null;
+    var sizes = el('div', { className: 'df-sizes', role: 'group', 'aria-label': 'Drive size' });
+    var choose = function (tb) {
+      self.addTb = tb;
+      Array.prototype.forEach.call(sizes.querySelectorAll('button[data-tb]'), function (button) {
+        button.setAttribute('aria-pressed', parseFloat(button.getAttribute('data-tb')) === tb ? 'true' : 'false');
+      });
+      if (DRIVE_SIZES.indexOf(tb) !== -1 || tb === 0) {
+        custom.value = '';
+      }
+      clear.hidden = tb === 0;
+      self.loadSeries();
+    };
+
+    DRIVE_SIZES.forEach(function (tb) {
+      sizes.appendChild(el('button', {
+        type: 'button',
+        className: 'df-size',
+        'data-tb': tb,
+        'aria-pressed': self.addTb === tb ? 'true' : 'false',
+        text: tb + ' TB',
+        onclick: function () { choose(self.addTb === tb ? 0 : tb); }
+      }));
+    });
+
+    custom.addEventListener('input', function () {
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        var tb = parseFloat(custom.value);
+        choose(tb > 0 && tb <= 10000 ? tb : 0);
+      }, 350);
+    });
+
+    var clear = el('button', { type: 'button', className: 'df-button is-quiet', hidden: self.addTb === 0, onclick: function () { choose(0); } }, [DF.icon('times'), 'Clear']);
+    sizes.appendChild(el('label', { className: 'df-size-custom', for: 'df-whatif-custom' }, [custom, el('span', { text: 'TB' })]));
+    sizes.appendChild(clear);
+
+    self.whatIfResult = el('div', { className: 'df-whatif-result', 'aria-live': 'polite' });
+    self.whatIfPanel.replaceChildren(
+      head,
+      el('p', { className: 'df-muted', style: 'margin:0 0 10px', text: 'Pick a drive size to see when ' + target.name + ' would fill with it.' }),
+      sizes,
+      self.whatIfResult
+    );
+  };
+
+  ForecastView.prototype.showWhatIfResult = function (target, addTb, times, capacity) {
+    var box = this.whatIfResult;
+    var noForecast = !target.readings || times.status === 'collecting';
+    var headline = function (value, detail) {
+      return el('div', { className: 'df-whatif-headline df-num' }, [
+        el('span', { className: 'df-muted', text: addTb ? 'With ' + addTb + ' TB more (' + DF.formatBytes(capacity) + ')' : 'Now, with ' + DF.formatBytes(target.size) }),
+        el('strong', { text: value }),
+        detail ? el('span', { text: detail }) : null
+      ]);
+    };
+
+    if (noForecast) {
+      box.replaceChildren(headline('Full in: N/A', 'There is no forecast yet: the first one comes after 7 days of readings.'));
+      return;
+    }
+    if (times.secondsToFull === null) {
+      box.replaceChildren(headline('Full in: never (∞)', target.name + ' isn\'t growing, so it won\'t fill at this rate.'));
+      return;
+    }
+    if (!addTb && times.status === 'full') {
+      box.replaceChildren(headline('Full now', 'Pick a size to see how long a new drive would last.'));
+      return;
+    }
+    if (!addTb) {
+      box.replaceChildren(
+        headline('Full in about ' + DF.formatDuration(times.secondsToFull), 'around ' + DF.formatDate(target.time + times.secondsToFull)),
+        el('div', { className: 'df-muted df-num', text: 'Pick a size to compare.' })
+      );
+      return;
+    }
+
+    var gained = target.secondsToFull === null ? null : times.secondsToFull - target.secondsToFull;
+    box.replaceChildren(
+      headline('Full in about ' + DF.formatDuration(times.secondsToFull), 'around ' + DF.formatDate(target.time + times.secondsToFull) + (gained && gained > 0 ? ', ' + DF.formatDuration(gained) + ' later than now' : '')),
+      el('div', { className: 'df-muted df-num', text: 'Likely ' + DF.rangeText(times) + '.' })
+    );
   };
 
   ForecastView.prototype.drawChart = function (holder, series) {
@@ -285,7 +314,8 @@
     var estimate = series.projection.map(function (row) { return { x: row[0] * 1000, y: row[1] }; });
     var start = history[0].x;
     var end = fast.length ? fast[fast.length - 1].x : history[history.length - 1].x;
-    var capacity = [{ x: start, y: series.capacity }, { x: end, y: series.capacity }];
+    var line = function (y) { return [{ x: start, y: y }, { x: end, y: y }]; };
+    var added = series.capacity !== series.baseCapacity;
 
     var values = history.map(function (p) { return p.y; }).concat(slow.map(function (p) { return p.y; }));
     var low = Math.min.apply(null, values);
@@ -310,25 +340,28 @@
         ctx.stroke();
         ctx.fillStyle = color('--df-text-2');
         ctx.font = '600 11px ' + style.fontFamily;
-        ctx.textAlign = 'left';
-        ctx.fillText('Now', Math.round(x) + 5, area.top + 12);
+        var nearRight = area.right - x < 40;
+        ctx.textAlign = nearRight ? 'right' : 'left';
+        ctx.fillText('Now', Math.round(x) + (nearRight ? -5 : 5), area.top + 12);
         ctx.restore();
       }
     };
 
     var ticks = timeTicks(start, end);
+    var datasets = [
+      { label: 'Used', data: history, borderColor: color('--df-accent'), borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, pointHoverBackgroundColor: color('--df-accent'), pointHoverBorderColor: color('--df-card'), pointHoverBorderWidth: 2, tension: 0, fill: false, order: 1 },
+      { label: 'Fast case', data: fast, borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, fill: false, order: 4 },
+      { label: 'Slow case', data: slow, borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, fill: '-1', backgroundColor: color('--df-band'), order: 4 },
+      { label: 'Estimate', data: estimate, borderColor: color('--df-accent'), borderWidth: 2, borderDash: [6, 4], pointRadius: 0, pointHoverRadius: 4, pointHoverBackgroundColor: color('--df-accent'), pointHoverBorderColor: color('--df-card'), pointHoverBorderWidth: 2, fill: false, order: 2 },
+      { label: 'Capacity', data: line(series.baseCapacity), borderColor: color('--df-text-3'), borderWidth: 1, pointRadius: 0, pointHoverRadius: 0, fill: false, order: 3 }
+    ];
+    if (added) {
+      datasets.push({ label: 'With drive added', data: line(series.capacity), borderColor: color('--df-text-2'), borderWidth: 1, borderDash: [4, 4], pointRadius: 0, pointHoverRadius: 0, fill: false, order: 3 });
+    }
 
     this.chart = new window.Chart(canvas, {
       type: 'line',
-      data: {
-        datasets: [
-          { label: 'Used', data: history, borderColor: color('--df-accent'), borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, pointHoverBackgroundColor: color('--df-accent'), pointHoverBorderColor: color('--df-card'), pointHoverBorderWidth: 2, tension: 0, fill: false, order: 1 },
-          { label: 'Fast case', data: fast, borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, fill: false, order: 4 },
-          { label: 'Slow case', data: slow, borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, fill: '-1', backgroundColor: color('--df-band'), order: 4 },
-          { label: 'Estimate', data: estimate, borderColor: color('--df-accent'), borderWidth: 2, borderDash: [6, 4], pointRadius: 0, pointHoverRadius: 4, pointHoverBackgroundColor: color('--df-accent'), pointHoverBorderColor: color('--df-card'), pointHoverBorderWidth: 2, fill: false, order: 2 },
-          { label: 'Capacity', data: capacity, borderColor: color('--df-text-3'), borderWidth: 1, pointRadius: 0, pointHoverRadius: 0, fill: false, order: 3 }
-        ]
-      },
+      data: { datasets: datasets },
       options: {
         animation: false,
         responsive: true,

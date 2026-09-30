@@ -12,9 +12,6 @@ enum TargetType: string
     /** Every data disk in the array, added together. */
     case Array = 'array';
 
-    /** One pool, such as the cache. */
-    case Pool = 'pool';
-
     /** One or more chosen disks or pools, added together. */
     case Disks = 'disks';
 

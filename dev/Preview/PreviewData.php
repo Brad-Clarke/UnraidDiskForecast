@@ -53,13 +53,13 @@ final class PreviewData
             [new Target('array', 'Array', TargetType::Array, [], 60, 180, 90), self::beforeFill($filling['regimes'], 480)],
             [new Target('media', 'Media', TargetType::Share, ['Media'], 60, 180, 365), self::beforeFill($filling['accelerating'], 300)],
             [new Target('photos', 'Photos', TargetType::Share, ['Photos'], 60, 90, 60), self::beforeFill($filling['bursty'], 45)],
-            [new Target('pool-cache', 'Cache', TargetType::Pool, ['cache'], 30, 30, 0), $nonFilling['cache-churn']->history],
+            [new Target('pool-cache', 'Cache', TargetType::Disks, ['cache'], 30, 30, 0), $nonFilling['cache-churn']->history],
             [new Target('backups', 'Backups', TargetType::Disks, ['disk5', 'disk6'], 360, 180, 0), $nonFilling['flat']->history],
             [new Target('scratch', 'Scratch disk', TargetType::Disks, ['disk6'], 60, 180, 0), self::firstDays($filling['deletes'], 150)],
-            [new Target('pool-nvme', 'Nvme', TargetType::Pool, ['nvme'], 60, 180, 0), self::firstDays($filling['steady'], 3)],
+            [new Target('pool-nvme', 'Nvme', TargetType::Disks, ['nvme'], 60, 180, 0), self::firstDays($filling['steady'], 3)],
         ];
 
-        $inventory = new Inventory(new FakePlatform());
+        $inventory = new Inventory(new FakePlatform($dataDir));
         $targets = [];
         foreach ($plan as [$target, $history]) {
             $capacity = (float) $inventory->spaceFor($target)->size;
@@ -67,7 +67,7 @@ final class PreviewData
             $targets[] = $target;
         }
 
-        (new SettingsStore("{$root}/settings.json", new ConsoleLogger()))->save(new Settings($dataDir, true, $targets));
+        (new SettingsStore("{$root}/settings.json", new ConsoleLogger()))->save(new Settings($targets));
     }
 
     private static function beforeFill(Scenario $scenario, int $days): History

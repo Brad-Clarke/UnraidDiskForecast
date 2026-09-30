@@ -103,6 +103,27 @@ final class HistoryStore
     }
 
     /**
+     * Deletes a target's history. Returns true when it is gone (or never existed).
+     */
+    public function delete(string $targetId): bool
+    {
+        $path = $this->path($targetId);
+        if (!is_file($path)) {
+            return true;
+        }
+
+        if (!@unlink($path)) {
+            $this->logger->warning("Could not delete the readings in {$path}.");
+
+            return false;
+        }
+
+        $this->logger->info("Deleted the readings in {$path}.");
+
+        return true;
+    }
+
+    /**
      * Size and modification time of a target's history, for cache keys; zeros when it has none.
      *
      * @return array{0: int, 1: int}

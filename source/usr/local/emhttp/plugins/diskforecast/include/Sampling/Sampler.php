@@ -25,6 +25,7 @@ final class Sampler
         private readonly Platform $platform,
         private readonly Inventory $inventory,
         private readonly HistoryStore $store,
+        private readonly string $dataDir,
     ) {
     }
 
@@ -35,8 +36,8 @@ final class Sampler
      */
     public function run(int $now): array
     {
-        if (!$this->platform->pathAvailable($this->settings->dataDir)) {
-            return ["Readings folder {$this->settings->dataDir} is not available (array stopped?); no readings taken."];
+        if (!$this->platform->pathAvailable($this->dataDir)) {
+            return ["Readings folder {$this->dataDir} is not available (array stopped?); no readings taken."];
         }
 
         $report = [];

@@ -40,8 +40,8 @@ final class HindcastRange implements RangeMethod
         private readonly array $horizonDays = [30, 90, 180, 365, 730],
         private readonly int $stepSeconds = 7 * self::DAY,
         private readonly int $minimumSamples = 8,
-        private readonly float $slowQuantile = 0.1,
-        private readonly float $fastQuantile = 0.9,
+        private readonly float $slowQuantile = 0.05,
+        private readonly float $fastQuantile = 0.95,
         private readonly int $maxPoints = 60,
     ) {
     }
@@ -91,7 +91,7 @@ final class HindcastRange implements RangeMethod
 
         ksort($deviations);
 
-        return new HindcastGrowthRange($trend->slope, $deviations, $fallback);
+        return new HindcastGrowthRange($trend->slope, $deviations, $fallback, (float) $this->windowSeconds);
     }
 
     private function slopeAt(History $history, int $origin): ?float

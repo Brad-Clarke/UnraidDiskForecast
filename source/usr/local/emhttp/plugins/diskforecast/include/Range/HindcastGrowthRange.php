@@ -14,12 +14,15 @@ final class HindcastGrowthRange implements GrowthRange
      * @param float $rate Trend bytes per second now.
      * @param array<int, array{0: float, 1: float, 2: float}> $deviations Per horizon in seconds (ascending keys):
      *     the slow-case, typical and fast-case difference between realised and predicted rate, in bytes per second.
-     * @param GrowthRange $fallback Range used where nothing was measured, and as the narrowest the range may be.
+     * @param GrowthRange $fallback Range used where nothing was measured; elsewhere its spread (recent short-term
+     *     wobble) is laid around the estimate and fades once the horizon passes the trend window.
+     * @param float $windowSeconds The trend window the fallback's spread was measured over.
      */
     public function __construct(
         public readonly float $rate,
         public readonly array $deviations,
         public readonly GrowthRange $fallback,
+        public readonly float $windowSeconds,
     ) {
     }
 
@@ -38,8 +41,10 @@ final class HindcastGrowthRange implements GrowthRange
         $estimate = $this->estimate($seconds);
         $deviation = $this->deviationFor($seconds);
         if ($deviation !== null) {
-            $slow = min($slow, ($this->rate + $deviation[0]) * $seconds);
-            $fast = max($fast, ($this->rate + $deviation[2]) * $seconds);
+            $fade = min(1.0, $this->windowSeconds / max(1.0, $seconds));
+            $centre = $this->fallback->estimate($seconds);
+            $slow = min($estimate + ($slow - $centre) * $fade, ($this->rate + $deviation[0]) * $seconds);
+            $fast = max($estimate + ($fast - $centre) * $fade, ($this->rate + $deviation[2]) * $seconds);
         }
 
         return [min($slow, $estimate), max($fast, $estimate)];
