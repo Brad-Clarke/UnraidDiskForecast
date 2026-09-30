@@ -1,0 +1,8 @@
+rootfs / rootfs rw,size=16384000k,nr_inodes=4096000 0 0
+/dev/sda1 /boot vfat rw,noatime 0 0
+/dev/md1p1 /mnt/disk1 xfs rw,noatime 0 0
+/dev/md2p1 /mnt/disk2 xfs rw,noatime 0 0
+/dev/md3p1 /mnt/disk3 xfs rw,noatime 0 0
+/dev/md10p1 /mnt/disk10 xfs rw,noatime 0 0
+/dev/nvme0n1p1 /mnt/cache btrfs rw,noatime 0 0
+nvme /mnt/nvme zfs rw,xattr 0 0

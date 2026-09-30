@@ -1,0 +1,62 @@
+<?xml version='1.0' standalone='yes'?>
+<!DOCTYPE PLUGIN [
+<!ENTITY name      "diskforecast">
+<!ENTITY author    "Brad Clarke">
+<!ENTITY version   "2026.09.28">
+<!ENTITY gitURL    "https://raw.githubusercontent.com/Brad-Clarke/UnraidDiskForecast/main">
+<!ENTITY pluginURL "&gitURL;/plugin/&name;.plg">
+<!ENTITY package   "&name;-&version;-noarch-1">
+<!ENTITY packageURL "&gitURL;/archive/&package;.txz">
+<!ENTITY md5       "6a8bea9647542d3b993092417bd56bde">
+<!ENTITY config    "/boot/config/plugins/&name;">
+]>
+
+<PLUGIN name="&name;"
+        author="&author;"
+        version="&version;"
+        pluginURL="&pluginURL;"
+        launch="Settings/DiskForecast"
+        icon="area-chart"
+        min="6.12.0">
+
+<CHANGES>
+###2026.09.28
+- First release: forecasts, graph, settings, dashboard tile and warnings.
+</CHANGES>
+
+<!-- The plugin's files. Kept on the flash drive so they reinstall at boot without a download. -->
+<FILE Name="&config;/&package;.txz" Run="upgradepkg --install-new">
+<URL>&packageURL;</URL>
+<MD5>&md5;</MD5>
+</FILE>
+
+<!-- Readings every 15 minutes; each target decides whether it is due. Old packages are removed. -->
+<FILE Run="/bin/bash">
+<INLINE>
+cat > &config;/&name;.cron &lt;&lt;'EOF'
+# Disk Forecast: take due readings and send warnings
+*/15 * * * * /usr/bin/php /usr/local/emhttp/plugins/&name;/scripts/sample.php &gt;/dev/null 2&gt;&amp;1
+EOF
+/usr/local/sbin/update_cron
+find &config; -maxdepth 1 -name '&name;-*.txz' ! -name '&package;.txz' -delete
+echo ""
+echo "Disk Forecast &version; is installed. Open Settings > Disk Forecast."
+echo ""
+</INLINE>
+</FILE>
+
+<!-- Uninstall: stop readings and remove the plugin's files. Settings and reading history are kept. -->
+<FILE Run="/bin/bash" Method="remove">
+<INLINE>
+rm -f &config;/&name;.cron
+/usr/local/sbin/update_cron
+removepkg &package;
+rm -rf /usr/local/emhttp/plugins/&name; /tmp/&name;
+rm -f &config;/&name;-*.txz
+echo ""
+echo "Disk Forecast is removed. Your settings (&config;/settings.json) and reading history were kept."
+echo ""
+</INLINE>
+</FILE>
+
+</PLUGIN>

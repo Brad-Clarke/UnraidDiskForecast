@@ -1,0 +1,14 @@
+Menu="DiskForecast:2"
+Title="Settings"
+Tag="cog"
+Markdown="false"
+---
+<?php
+$dfRoot = ($docroot ?? '/usr/local/emhttp') . '/plugins/diskforecast/assets/';
+$dfAsset = static fn (string $file): string => "/plugins/diskforecast/assets/{$file}?v=" . (int) @filemtime($dfRoot . $file);
+$dfTheme = in_array($display['theme'] ?? '', ['black', 'gray'], true) ? 'dark' : 'light';
+?>
+<link rel="stylesheet" href="<?= $dfAsset('diskforecast.css') ?>">
+<div id="df-settings" class="df-root" data-theme="<?= $dfTheme ?>" data-api="/plugins/diskforecast/api.php" data-csrf="<?= htmlspecialchars($var['csrf_token'] ?? '', ENT_QUOTES) ?>" data-done-url="/Settings"></div>
+<script src="<?= $dfAsset('common.js') ?>"></script>
+<script src="<?= $dfAsset('settings.js') ?>"></script>
