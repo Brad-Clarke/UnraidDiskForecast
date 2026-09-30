@@ -13,12 +13,12 @@ require __DIR__ . '/bootstrap.php';
 
 use DiskForecast\Composition;
 use DiskForecast\Config\Settings;
-use DiskForecast\Config\SettingsStore;
 use DiskForecast\Config\Target;
 use DiskForecast\Config\TargetType;
 use DiskForecast\Dev\Preview\ConsoleLogger;
 use DiskForecast\Dev\Preview\ConsoleNotifier;
 use DiskForecast\Dev\Preview\FakePlatform;
+use DiskForecast\Dev\Preview\PreviewData;
 use DiskForecast\HistoryStore;
 use DiskForecast\Sample;
 use DiskForecast\Storage\UnraidPlatform;
@@ -32,11 +32,20 @@ $check = static function (bool $ok, string $what) use (&$failures): void {
 $root = sys_get_temp_dir() . '/diskforecast-smoke-' . getmypid();
 $logger = new ConsoleLogger();
 $notifier = new ConsoleNotifier();
-$store = new SettingsStore("{$root}/settings.json", $logger);
-$store->save(new Settings([
+$store = PreviewData::settingsStore($root, $logger);
+$check($store->load() === null, 'with only default.cfg, the plugin is on automatic targets');
+$saved = new Settings([
     new Target('array', 'Array', TargetType::Array, [], 60, 180, 3650),
     new Target('media', 'Media', TargetType::Share, ['Media'], 15, 30, 0),
-]));
+    new Target('fast', 'Fast "pools"', TargetType::Disks, ['cache', 'nvme'], 30, 0, 90),
+]);
+$store->save($saved);
+$loaded = $store->load();
+$expected = $saved->toArray();
+$expected['targets'][2]['name'] = 'Fast pools';
+$check($loaded !== null && $loaded->toArray() === $expected, 'settings round-trip through diskforecast.cfg (quotes dropped from names)');
+$check(str_contains((string) file_get_contents("{$root}/diskforecast.cfg"), 'TARGET_3_MEMBERS="cache,nvme"'), 'the file is plain key="value" lines');
+$store->save(new Settings(array_slice($saved->targets, 0, 2)));
 $app = new Composition(new FakePlatform("{$root}/data"), $store, "{$root}/cache", $logger, $notifier);
 
 $now = 1_800_000_000;

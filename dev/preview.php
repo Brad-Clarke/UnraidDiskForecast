@@ -16,7 +16,7 @@ require __DIR__ . '/bootstrap.php';
 
 use DiskForecast\Dev\Preview\PreviewComposition;
 
-$pluginRoot = dirname(__DIR__) . '/source/usr/local/emhttp/plugins/diskforecast';
+$pluginRoot = dirname(__DIR__) . '/src/usr/local/emhttp/plugins/diskforecast';
 $dataRoot = __DIR__ . '/data/preview';
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 

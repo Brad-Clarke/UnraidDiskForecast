@@ -1,11 +1,12 @@
+#!/usr/bin/php
 <?php
 
 declare(strict_types=1);
 
 /**
- * Cron entry point, run every 15 minutes: takes the readings that are due, then sends
- * any warnings. Run it by hand to see what it does:
- *   php /usr/local/emhttp/plugins/diskforecast/scripts/sample.php
+ * Cron entry point, run every 15 minutes and when the array's disks are mounted: takes the
+ * readings that are due, then sends any warnings. Run it by hand to see what it does:
+ *   /usr/local/emhttp/plugins/diskforecast/scripts/sample.php
  */
 
 require dirname(__DIR__) . '/include/bootstrap.php';

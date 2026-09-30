@@ -47,10 +47,19 @@ final class Composition
     public static function production(): self
     {
         $logger = new SyslogLogger();
+        $wrappers = '/usr/local/emhttp/webGui/include/Wrappers.php';
+        if (!function_exists('parse_plugin_cfg') && is_file($wrappers)) {
+            require_once $wrappers;
+        }
 
         return new self(
             new UnraidPlatform(),
-            new SettingsStore('/boot/config/plugins/diskforecast/settings.json', $logger),
+            new SettingsStore(
+                '/boot/config/plugins/diskforecast/diskforecast.cfg',
+                '/usr/local/emhttp/plugins/diskforecast/default.cfg',
+                $logger,
+                function_exists('parse_plugin_cfg') ? static fn (): array => parse_plugin_cfg('diskforecast') : null,
+            ),
             '/tmp/diskforecast',
             $logger,
             new UnraidNotifier($logger),

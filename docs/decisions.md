@@ -23,9 +23,12 @@ while measuring a share meant scanning its folders, and nothing is scanned any m
 
 ## 2026-09-28: Where things are kept
 
-- **Settings:** `/boot/config/plugins/diskforecast/settings.json`, written only when the user
-  presses Apply. Until then defaults are used: the whole array plus each pool, hourly, 180-day
-  window, no warnings. Readings start at install with those defaults.
+- **Settings:** `/boot/config/plugins/diskforecast/diskforecast.cfg`, Unraid's usual
+  `key="value"` file over the packaged `default.cfg`, read with `parse_plugin_cfg` where
+  Unraid provides it. Targets are numbered keys (`TARGETS="2"`, `TARGET_1_NAME="Array"`,
+  ...); names may not contain `"`. Written only when the user presses Apply. While
+  `AUTO_TARGETS="yes"` (the default) the plugin tracks the whole array plus each pool, hourly,
+  180-day window, no warnings, so readings start at install.
 - **Readings:** one CSV per target (`time,size,used,free`) in the readings folder, which is
   not a setting (2026-09-30: other plugins do not ask either). It is the first pool holding
   `appdata`, addressed directly (`/mnt/cache/appdata/diskforecast`), because a path through
@@ -49,6 +52,43 @@ Following Unraid's convention of viewing under Tools and configuring under Setti
   "never (∞)" and one without a forecast yet reads "N/A". `?target=<id>` preselects a target;
   the dashboard rows link that way.
 - **Settings:** Settings › User Utilities › Disk Forecast (`/Settings/DiskForecastSettings`).
+
+## 2026-09-30: Packaging and releases follow the Unraid plugin brief
+
+- **Layout:** `src/` is the package root; `plugin/diskforecast.plg.in` is the manifest
+  template and `plugin/plugin.conf` holds the repository, support URL and minimum Unraid
+  version; `build/` is output only and never committed.
+- **One build script**, `scripts/build.sh --version`, used locally and in CI: normalises
+  permissions, builds the `.txz` with GNU tar (root-owned, sorted, single-threaded xz, every
+  timestamp set to the last commit's time), so the same commit always builds byte-identical
+  output, then renders the `.plg` with the MD5 and `<CHANGES>` from `CHANGELOG.md`.
+- **Manifest:** `pluginURL` is `releases/latest/download/diskforecast.plg`; the package URL
+  is the versioned release asset. The install script deletes older cached packages, copies
+  `default.cfg` only if there is no settings file, writes the cron file only when its line
+  changes (no flash write on an ordinary boot) and needs no network. Remove stops the cron job
+  first, deletes the readings (2026-10-01: the owner wants nothing left behind), then removes
+  the package, the plugin folder, `/boot/config/plugins/diskforecast` (settings and cached
+  package) and `/tmp/diskforecast`. The readings folder comes from `scripts/data-dir.php`,
+  and only a path ending in `/appdata/diskforecast` under `/mnt` is deleted; while the array
+  is stopped it cannot be reached, so it is left and the uninstall says so. Updates never run
+  the remove script, so they keep settings and readings.
+- **Array start:** `event/disks_mounted` takes due readings as soon as the disks mount; the
+  cron run already skips while the readings folder's mount is missing.
+- **Checks** (`scripts/ci-checks.sh`, `test-install-scripts.sh`, `test-release-checks.sh`)
+  run in CI on every pull request and push to main, and again in the release workflow. The
+  release gate (`scripts/release-checks.sh`) refuses a bad tag, an impossible date, a version
+  already released, a missing changelog section, a placeholder support URL, and a repository
+  that does not match `plugin.conf`. After publishing, `scripts/smoke-release.sh` fetches the
+  install URL and the package and checks the version and MD5.
+- **Deliberate differences from the brief:**
+  - Settings are saved through the plugin's own endpoint (`api.php?action=save`, carrying
+    Unraid's CSRF token) rather than a form posting to `/update.php`: targets are a list that
+    is validated against the server's disks, pools and shares, and removing one deletes its
+    readings only after the save succeeds. `/update.php` writes whatever it is sent and
+    cannot do either.
+  - The pages keep the plugin's own styles (light and dark themes follow Unraid's theme)
+    rather than stock webGui styling. Nothing is loaded from outside the plugin: Chart.js is
+    bundled.
 
 ## 2026-09-28: Schedule
 

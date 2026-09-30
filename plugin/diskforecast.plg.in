@@ -1,0 +1,55 @@
+<?xml version='1.0' standalone='yes'?>
+<!DOCTYPE PLUGIN [
+<!ENTITY name      "diskforecast">
+<!ENTITY author    "Bradley Clarke">
+<!ENTITY version   "@VERSION@">
+<!ENTITY md5       "@MD5@">
+<!ENTITY support   "@SUPPORT_URL@">
+<!ENTITY gitURL    "https://github.com/@REPOSITORY@">
+<!ENTITY pluginURL "&gitURL;/releases/latest/download/&name;.plg">
+<!ENTITY pkg       "&name;-&version;-noarch-1">
+<!ENTITY pkgURL    "&gitURL;/releases/download/v&version;/&pkg;.txz">
+<!ENTITY plgdir    "/boot/config/plugins/&name;">
+<!ENTITY emhttp    "/usr/local/emhttp/plugins/&name;">
+]>
+<PLUGIN name="&name;" author="&author;" version="&version;"
+        pluginURL="&pluginURL;" support="&support;"
+        icon="area-chart" launch="Settings/DiskForecastSettings" min="@MIN_VERSION@">
+
+<CHANGES>
+@CHANGES@
+</CHANGES>
+
+<FILE Name="&plgdir;/&pkg;.txz" Run="upgradepkg --install-new">
+<URL>&pkgURL;</URL>
+<MD5>&md5;</MD5>
+</FILE>
+
+<FILE Run="/bin/bash">
+<INLINE>
+find &plgdir; -maxdepth 1 -name '&name;-*.txz' ! -name '&pkg;.txz' -delete
+[ -f &plgdir;/&name;.cfg ] || cp &emhttp;/default.cfg &plgdir;/&name;.cfg
+cron="*/15 * * * * &emhttp;/scripts/sample.php &gt;/dev/null 2&gt;&amp;1"
+if [ "$(cat &plgdir;/&name;.cron 2&gt;/dev/null)" != "$cron" ]; then
+  printf '%s\n' "$cron" &gt; &plgdir;/&name;.cron
+fi
+/usr/local/sbin/update_cron
+echo "&name; &version; installed"
+</INLINE>
+</FILE>
+
+<FILE Run="/bin/bash" Method="remove">
+<INLINE>
+rm -f &plgdir;/&name;.cron
+/usr/local/sbin/update_cron
+readings="$(/usr/bin/php &emhttp;/scripts/data-dir.php 2&gt;/dev/null || true)"
+case "$readings" in
+  /mnt/*/appdata/&name;) rm -rf "$readings" ;;
+  *) echo "The readings folder is not available (is the array stopped?), so it was not deleted: remove appdata/&name; by hand." ;;
+esac
+removepkg &pkg;
+rm -rf &emhttp; &plgdir; /tmp/&name;
+echo "&name; removed"
+</INLINE>
+</FILE>
+</PLUGIN>

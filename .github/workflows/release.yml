@@ -1,0 +1,88 @@
+name: Release
+
+# Stable releases: push a tag v<version>. Betas and dry runs: run this workflow by hand.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release (YYYY.MM.DD or YYYY.MM.DD.N)
+        required: true
+      prerelease:
+        description: Publish as a beta (a GitHub prerelease; stable users are not offered it)
+        type: boolean
+        default: false
+      dry_run:
+        description: Run every check and the build, but publish nothing
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Work out what to release
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_PRERELEASE: ${{ inputs.prerelease }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          if [ "$EVENT" = "push" ]; then
+            version="${GITHUB_REF_NAME#v}"; prerelease=false; dry_run=false
+          else
+            version="$INPUT_VERSION"; prerelease="$INPUT_PRERELEASE"; dry_run="$INPUT_DRY_RUN"
+          fi
+          {
+            echo "VERSION=$version"
+            echo "PRERELEASE=$prerelease"
+          } >> "$GITHUB_ENV"
+          echo "dry_run=$dry_run" >> "$GITHUB_OUTPUT"
+          echo "Releasing v$version (prerelease: $prerelease, dry run: $dry_run)"
+
+      - name: Release checks
+        run: bash scripts/release-checks.sh --version "$VERSION" --notes-out "$RUNNER_TEMP/notes.md"
+
+      - name: Install xmllint
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libxml2-utils
+
+      - name: Build
+        run: SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)" bash scripts/build.sh --version "$VERSION"
+
+      - name: Check the build
+        run: bash scripts/ci-checks.sh
+
+      - name: Test the install and remove scripts
+        run: bash scripts/test-install-scripts.sh
+
+      - name: Test the release checks
+        run: bash scripts/test-release-checks.sh
+
+      - name: Publish the release
+        if: steps.plan.outputs.dry_run != 'true'
+        run: |
+          flags=(--title "v$VERSION" --notes-file "$RUNNER_TEMP/notes.md" --target "$GITHUB_SHA")
+          if [ "$PRERELEASE" = "true" ]; then flags+=(--prerelease); else flags+=(--latest); fi
+          gh release create "v$VERSION" build/diskforecast.plg "build/diskforecast-$VERSION-noarch-1.txz" "${flags[@]}"
+
+      - name: Smoke test the published release
+        if: steps.plan.outputs.dry_run != 'true'
+        run: |
+          if [ "$PRERELEASE" = "true" ]; then
+            bash scripts/smoke-release.sh --version "$VERSION" --prerelease
+          else
+            bash scripts/smoke-release.sh --version "$VERSION"
+          fi

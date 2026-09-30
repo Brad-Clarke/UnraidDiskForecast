@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-require __DIR__ . '/../source/usr/local/emhttp/plugins/diskforecast/include/bootstrap.php';
+require __DIR__ . '/../src/usr/local/emhttp/plugins/diskforecast/include/bootstrap.php';
 
 spl_autoload_register(static function (string $class): void {
     $prefix = 'DiskForecast\\Dev\\';

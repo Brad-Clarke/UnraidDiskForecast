@@ -1,63 +1,66 @@
 # Disk Forecast for Unraid
 
-Tracks how fast your array, pools, disks or shares fill up and projects when each one runs
-out of space, with an estimate, a likely range, a graph and optional warnings, so you can
-budget for new drives before you need them.
+Tracks how fast your array, disks, pools or shares fill up and projects when each one will
+run out of space, with an estimate, a likely range and the expected growth, so you can budget
+for new drives before you need them.
 
-- **Forecast** (Tools › Disk Utilities › Disk Forecast): every target with its meter, time to
-  full, date, likely range and monthly growth; a graph of history, the estimate, the range band
-  and capacity (30 days to all history) with a projected-usage table; and a "What if I add a
-  drive" card that shows the new full date and draws the new capacity on the graph.
-- **Settings** (Settings › User Utilities › Disk Forecast): targets that are the whole array,
-  any mix of disks and pools, or a share, each with its own reading interval (15 minutes to
-  1 day), trend window (7 days to all history) and warning threshold.
-- **Dashboard tile:** every target with its meter and time to full.
-- **Warnings** through Unraid notifications.
+![Disk Forecast](docs/screenshot.png)
 
-It only reads filesystem counters: no folder is scanned and no disk is woken. See
-[docs/decisions.md](docs/decisions.md) for how the forecast works and was chosen.
+- **Tools › Disk Forecast:** every target with its time to full, a graph of usage and
+  forecast (30 days to all history), a projected-usage table, and a "What if I add a drive"
+  card that shows the new full date and draws the new capacity on the graph.
+- **Settings › Disk Forecast:** track the whole array, any mix of disks and pools, or a
+  share, each with its own reading interval (15 minutes to 1 day), trend window (7 days to
+  all history) and warning threshold.
+- **Dashboard tile:** every target's time to full at a glance.
+- **Warnings** through Unraid notifications when a target is due to fill within your window.
 
-## Layout
+It only reads free-space figures the filesystem already keeps: no folder is scanned and no
+disk is woken. Readings are kept in your pool's `appdata` folder, never on the flash drive.
+How the forecast works and why it was chosen: [docs/decisions.md](docs/decisions.md).
 
-- `source/usr/local/emhttp/plugins/diskforecast/`: what gets installed on the server.
-  - `*.page`: the Forecast page (Tools), the Settings page and the dashboard tile.
-  - `api.php`: JSON for the pages. `scripts/sample.php`: the 15-minute cron run.
-  - `include/`: storage reading, history files, forecast maths, settings, warnings.
-  - `assets/`: styles, scripts and Chart.js 4.4.7 (bundled, works offline).
-- `plugin/`: the `.plg` template and the generated `.plg`. `archive/`: built packages.
-- `dev/`: development tools. Nothing here is installed.
-- `tests/`: PHPUnit tests.
+## Install
 
-## Development (on a PC, no server needed)
+In Unraid, go to **Plugins › Install Plugin** and paste:
 
-Needs PHP 8.1+ and Python 3 (for the build).
-
-```sh
-php -S 127.0.0.1:8765 dev/preview.php        # preview at http://127.0.0.1:8765/
-php dev/smoke.php                            # cron run, warnings and Unraid file parsing, end to end
-php -d memory_limit=1G dev/backtest.php      # forecast accuracy against fake histories (fits, ranges also)
-python dev/build.py --version 2026.09.28     # builds archive/*.txz and plugin/diskforecast.plg
+```
+https://github.com/Brad-Clarke/UnraidDiskForecast/releases/latest/download/diskforecast.plg
 ```
 
-The preview runs the real plugin code against a made-up server (six disks, two pools, four
-shares) with fake histories covering every state. `/` is the Forecast page,
-`/Settings/DiskForecastSettings` the settings and `/Dashboard` the tile;
-`?theme=white|black|azure|gray` switches Unraid theme and `/reset` rebuilds the data.
+Requires Unraid 7.0 or later. Updates arrive through Unraid's plugin manager and keep your
+settings and readings. Removing the plugin deletes both (start the array first, or the
+readings folder can't be reached and is left behind).
 
-## Installing
+**Support:** the Disk Forecast thread on the Unraid forums (link to follow).
 
-1. **Check first (read-only).** Copy `dev/check-server.sh` to the server and run
-   `bash check-server.sh > diskforecast-check.txt`. It prints the files and figures the
-   plugin reads and changes nothing.
-2. **Build:** `python dev/build.py`.
-3. **Install from GitHub:** push `plugin/` and `archive/`, then in Unraid go to Plugins ›
-   Install Plugin and paste the raw URL of `plugin/diskforecast.plg`
-   (`--git-url` sets the base URL; it defaults to `Brad-Clarke/UnraidDiskForecast` on `main`).
-   **Or offline:** copy `archive/diskforecast-<version>-noarch-1.txz` to
-   `/boot/config/plugins/diskforecast/` and the `.plg` anywhere on the server, then run
-   `plugin install /path/to/diskforecast.plg`. The package's MD5 matches, so nothing is downloaded.
-4. Open Tools › Disk Forecast (settings are under Settings › Disk Forecast). Readings begin
-   within 15 minutes, in the pool's appdata folder. The first forecast
-   appears after 7 days; the range is calibrated once there is window + 30 days of history.
+## Development
 
-Uninstalling removes the plugin's files and cron line, and keeps settings and readings.
+Needs bash, GNU tar, xz, PHP 8.1+ and Python 3. `shellcheck` and `xmllint` for the checks.
+
+```sh
+scripts/build.sh --version 2026.09.30   # build/diskforecast-<version>-noarch-1.txz and build/diskforecast.plg
+scripts/ci-checks.sh                    # XML, shellcheck, php -l, package audit, MD5
+scripts/test-install-scripts.sh         # install/remove scripts are idempotent and offline
+scripts/test-release-checks.sh          # the release gate refuses what it should
+php -S 127.0.0.1:8765 dev/preview.php   # the real pages against a fake server
+php dev/smoke.php                       # cron run, warnings, settings file and Unraid parsing
+php -d memory_limit=1G dev/backtest.php # forecast accuracy against fake histories
+```
+
+Layout: `src/` is the package root and mirrors the Unraid filesystem; `plugin/` holds the
+manifest template, `plugin.conf` (repository, support URL, minimum Unraid version) and the
+Community Apps icon; `dev/` and `tests/` are never installed.
+
+## Releasing
+
+1. Add a `## <version>` section to `CHANGELOG.md` (version `YYYY.MM.DD`, or `YYYY.MM.DD.N`
+   for a second release that day). Never reuse a version.
+2. Tag and push: `git tag v<version> && git push origin v<version>`.
+   The release workflow checks the tag, the changelog and the support URL, builds, runs every
+   check, publishes the `.plg` and `.txz` to a GitHub release, and confirms the install URL
+   serves the new version.
+3. For a beta or a rehearsal, run the **Release** workflow by hand: tick *prerelease* for a
+   beta (stable users are not offered it), or leave *dry run* ticked to check everything and
+   publish nothing.
+
+Licence: GPLv2 ([LICENSE](LICENSE)). Chart.js (MIT) is bundled in `assets/`.

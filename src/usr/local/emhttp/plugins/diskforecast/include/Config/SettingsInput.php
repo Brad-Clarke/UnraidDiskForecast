@@ -69,6 +69,8 @@ final class SettingsInput
             $errors[] = "Target {$position}: give it a name.";
         } elseif ((int) preg_match_all('/./us', $name) > self::MAX_NAME) {
             $errors[] = "{$label}: the name can be at most " . self::MAX_NAME . ' characters.';
+        } elseif (str_contains($name, '"')) {
+            $errors[] = "{$label}: the name can't contain double quotes.";
         }
 
         $type = TargetType::tryFrom((string) ($raw['type'] ?? ''));

@@ -23,7 +23,7 @@ final class PreviewComposition
 
         return new Composition(
             new FakePlatform("{$root}/data"),
-            new SettingsStore("{$root}/settings.json", $logger),
+            PreviewData::settingsStore($root, $logger),
             "{$root}/cache",
             $logger,
             new ConsoleNotifier(),

@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install xmllint
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libxml2-utils
+
+      - name: Build with a test version
+        run: bash scripts/build.sh --version 2000.01.01
+
+      - name: Check the build
+        run: bash scripts/ci-checks.sh
+
+      - name: Test the install and remove scripts
+        run: bash scripts/test-install-scripts.sh
+
+      - name: Test the release checks
+        run: bash scripts/test-release-checks.sh
+
+      - name: Upload the test build
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: diskforecast-test-build
+          path: build/
+          if-no-files-found: error

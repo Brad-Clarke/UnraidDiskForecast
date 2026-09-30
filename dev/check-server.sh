@@ -37,13 +37,16 @@ grep -E '^shareUser(Include|Exclude)=' /boot/config/share.cfg 2>/dev/null || ech
 section "Mounts under /mnt"
 awk '$2 ~ "^/mnt/" {print $2, $3}' /proc/mounts
 
+mapfile -t mounts < <(awk '$2 ~ "^/mnt/[^/]+$" {print $2}' /proc/mounts | sort -V)
+
 section "Space as the plugin will read it (statvfs, bytes)"
-awk '$2 ~ "^/mnt/[^/]+$" {print $2}' /proc/mounts | sort -V | while read -r mount; do
+for mount in "${mounts[@]}"; do
+  # shellcheck disable=SC2016 # PHP code: $m and $argv are PHP variables, not shell ones.
   php -r '$m = $argv[1]; printf("%-22s size %16s  free %16s\n", $m, number_format(disk_total_space($m)), number_format(disk_free_space($m)));' "$mount" 2>/dev/null
 done
 
 section "df for comparison"
-df -B1 --output=target,fstype,size,used,avail $(awk '$2 ~ "^/mnt/[^/]+$" {print $2}' /proc/mounts | sort -V) 2>/dev/null
+df -B1 --output=target,fstype,size,used,avail "${mounts[@]}" 2>/dev/null
 
 section "Notify script"
 ls -l /usr/local/emhttp/webGui/scripts/notify 2>/dev/null || echo "not found"

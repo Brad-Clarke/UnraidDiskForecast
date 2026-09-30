@@ -1,0 +1,4 @@
+#!/bin/bash
+# Disk Forecast: take any due readings as soon as the array's disks are mounted,
+# rather than waiting for the next 15-minute cron run.
+/usr/bin/php /usr/local/emhttp/plugins/diskforecast/scripts/sample.php >/dev/null 2>&1 &

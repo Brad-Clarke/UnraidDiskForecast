@@ -12,6 +12,7 @@ use DiskForecast\Dev\Synthetic\Scenario;
 use DiskForecast\Dev\Synthetic\ScenarioLibrary;
 use DiskForecast\History;
 use DiskForecast\HistoryFile;
+use DiskForecast\Logging\Logger;
 use DiskForecast\Sample;
 use DiskForecast\Storage\Inventory;
 
@@ -32,7 +33,7 @@ final class PreviewData
      */
     public static function ensure(string $root): void
     {
-        if (is_file("{$root}/settings.json")) {
+        if (is_file("{$root}/diskforecast.cfg")) {
             return;
         }
 
@@ -67,7 +68,15 @@ final class PreviewData
             $targets[] = $target;
         }
 
-        (new SettingsStore("{$root}/settings.json", new ConsoleLogger()))->save(new Settings($targets));
+        self::settingsStore($root, new ConsoleLogger())->save(new Settings($targets));
+    }
+
+    /**
+     * The settings file under the preview folder, over the plugin's real default.cfg.
+     */
+    public static function settingsStore(string $root, Logger $logger): SettingsStore
+    {
+        return new SettingsStore("{$root}/diskforecast.cfg", dirname(__DIR__, 2) . '/src/usr/local/emhttp/plugins/diskforecast/default.cfg', $logger);
     }
 
     private static function beforeFill(Scenario $scenario, int $days): History
