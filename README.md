@@ -45,16 +45,17 @@ keep your settings and readings. Removing the plugin deletes both.
 ## How the forecast works
 
 - **Readings.** At each interval the plugin notes how much space each target has used. The
-  first forecast appears after 7 days of readings.
+  first forecast appears after 7 days of readings; until then the row counts down to it.
 - **The trend.** It fits a trend through the history you chose (180 days by default). The
   fit leans on the typical day, so a one-off big copy or clean-out doesn't swing it.
-- **Checking itself.** Once there's enough history (the trend window plus a month), the
+- **Checking itself.** Once there's enough history (the trend window plus about 11 weeks), the
   plugin replays its own past: at many earlier points it forecasts as if that were today,
   and compares with what actually happened. If your usage has tended to speed up or slow
   down, the estimate is adjusted for that.
 - **The likely range** is how far those past forecasts were off: the full date usually
   lands inside it, but it isn't a promise. A sudden import or a change in habits can't be
-  seen coming. Until the plugin can check itself, the row says *Rough estimate*.
+  seen coming. Until the plugin can check itself, the row says *Rough estimate* with how far
+  along it is; hover over it for the date it firms up.
 - **Expected growth** is the free space divided by the time to full, so the numbers on a row
   always agree.
 - **Not filling** means usage is flat or shrinking over the trend window, so there's no

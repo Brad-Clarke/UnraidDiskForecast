@@ -165,7 +165,8 @@ fill date.
   (median error): steady 2%, bursty 16%, deletes 21%, accelerating 3%, slowing 9%, changing
   habits 26%, one-off import 29%. The recent short-term spread is laid around the estimate
   and fades beyond the trend window (below).
-- **Before there is enough history** (window + 30 days) the range is the 10th–90th percentile
+- **Before there is enough history** (window + 30 days + 7 weeks: eight weekly past points
+  for the 30-day horizon) the range is the 10th–90th percentile
   of the fill rate across week-or-longer blocks of the window (up to 12), and the page labels
   it a rough estimate.
 - **Rejected ranges:** the textbook Theil–Sen confidence interval covered 4% of outcomes; a

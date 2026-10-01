@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026.10.01.1
+
+- A new target now counts down to its first forecast ("First forecast in 4d", with the date) and shows how far along it is; hover for the detail.
+- "Rough estimate" shows how far along calibration is, and hovering gives the date the range firms up. That date is now correct: about 8½ months of readings with the default 180-day trend, not 7.
+
 ## 2026.10.01
 
 - Fixed readings never starting after a fresh install: the reading schedule is now set up during installation instead of waiting for the next reboot.

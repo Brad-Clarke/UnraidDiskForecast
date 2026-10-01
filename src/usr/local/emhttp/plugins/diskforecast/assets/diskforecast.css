@@ -158,6 +158,7 @@
 .df-row-sub > :last-child { text-align: right; }
 .df-row-note { color: var(--df-text-2); font-size: 12px; }
 .df-row-note strong { color: var(--df-text); font-weight: 600; }
+.df-hint { text-decoration: underline dotted; text-underline-offset: 3px; cursor: help; }
 
 .df-meter {
   height: 6px;

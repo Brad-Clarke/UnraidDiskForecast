@@ -11,11 +11,14 @@
     var warnings = shown.filter(function (t) { return t.warning || t.status === 'full'; }).length;
     var soonest = shown.filter(function (t) { return t.secondsToFull !== null; })
       .sort(function (a, b) { return a.secondsToFull - b.secondsToFull; })[0];
+    var collecting = shown.filter(function (t) { return t.readings && t.status === 'collecting'; })
+      .sort(function (a, b) { return a.forecastFrom - b.forecastFrom; })[0];
 
     if (subtitle) {
       subtitle.textContent = warnings
         ? warnings + (warnings === 1 ? ' target needs' : ' targets need') + ' attention'
-        : (soonest ? 'Next full: ' + soonest.name + ' in ' + DF.formatDuration(soonest.secondsToFull) : 'Nothing filling up');
+        : (soonest ? 'Next full: ' + soonest.name + ' in ' + DF.formatDuration(soonest.secondsToFull)
+          : (collecting ? DF.rowStatus(collecting).text : 'Nothing filling up'));
     }
 
     root.replaceChildren.apply(root, shown.map(function (target) {

@@ -16,7 +16,7 @@ use DiskForecast\Logging\Logger;
 final class ForecastService
 {
     /** Bumped whenever the forecast maths changes, so old cached results are ignored. */
-    private const CACHE_VERSION = 7;
+    private const CACHE_VERSION = 8;
 
     public function __construct(
         private readonly HistoryStore $store,
@@ -46,10 +46,15 @@ final class ForecastService
         }
 
         $history = $this->history($target);
+        $forecaster = Forecaster::standard($target->windowSeconds());
+        $first = $history->first()?->time;
+        $calibration = $forecaster->calibrationSeconds();
         $result = new TargetForecast(
-            Forecaster::standard($target->windowSeconds())->forecast($history),
-            $history->first()?->time,
+            $forecaster->forecast($history),
+            $first,
             $history->count(),
+            $first === null ? null : $first + $forecaster->minimumSpanSeconds(),
+            $first === null || $calibration === null ? null : $first + $calibration,
         );
         $this->writeCache($target->id, $path, $result);
 

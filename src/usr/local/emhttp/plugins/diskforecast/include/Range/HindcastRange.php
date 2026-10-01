@@ -51,6 +51,15 @@ final class HindcastRange implements RangeMethod
         return 'hindcast';
     }
 
+    /**
+     * History needed before the shortest horizon has enough past moments to be measured,
+     * so before the range is calibrated (gaps in the readings can push it later).
+     */
+    public function calibrationSeconds(): int
+    {
+        return $this->windowSeconds + min($this->horizonDays) * self::DAY + ($this->minimumSamples - 1) * $this->stepSeconds;
+    }
+
     public function prepare(History $history, int $now, Points $window, Line $trend): GrowthRange
     {
         $fallback = $this->fallback->prepare($history, $now, $window, $trend);

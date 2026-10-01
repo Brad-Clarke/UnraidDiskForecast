@@ -224,11 +224,25 @@
   }
 
   /**
+   * How much of the history needed by the given time has been collected: a whole percentage,
+   * held below 100 until the stage is reached, and "3d 2h of the 7d of readings needed".
+   */
+  function readingProgress(target, until) {
+    var needed = until - target.firstReading;
+    var done = Math.min(needed, Math.max(0, target.time - target.firstReading));
+    return {
+      percent: Math.min(99, Math.floor(done / needed * 100)),
+      text: formatDuration(done) + ' of the ' + formatDuration(needed) + ' of readings needed'
+    };
+  }
+
+  /**
    * The headline of a target's forecast: the time to full (or state), its colour, the date,
-   * and the extra lines the Forecast page shows under the meter.
+   * a hint shown on hover, and the extra lines the Forecast page shows under the meter. A
+   * note is [text, bold value, hint].
    */
   function rowStatus(target) {
-    var status = { text: '', kind: '', icon: null, date: '', notes: [] };
+    var status = { text: '', kind: '', icon: null, date: '', hint: null, notes: [] };
 
     if (!target.readings) {
       status.text = 'Waiting for readings';
@@ -245,9 +259,12 @@
     }
 
     if (target.status === 'collecting') {
-      status.text = 'Collecting';
-      status.date = formatDuration(target.time - target.firstReading) + ' so far';
-      status.notes.push(['First forecast after 7 days of readings.', null]);
+      var first = readingProgress(target, target.forecastFrom);
+      var left = target.forecastFrom - target.time;
+      status.text = left > 0 ? 'First forecast in ' + formatDuration(left) : 'First forecast soon';
+      status.date = left > 0 ? 'around ' + formatDate(target.forecastFrom) : '';
+      status.hint = first.text + '.';
+      status.notes.push(['Collecting · ' + first.percent + '%', null, status.hint]);
       return status;
     }
 
@@ -267,8 +284,10 @@
     if (target.growthPerMonth > 0) {
       status.notes.push(['Expected growth: ', formatRate(target.growthPerMonth)]);
     }
-    if (!target.calibrated && target.windowDays > 0) {
-      status.notes.push(['Rough estimate until there are ' + Math.round((target.windowDays + 30) / 30.44) + ' months of readings.', null]);
+    if (!target.calibrated && target.windowDays > 0 && target.calibratedFrom) {
+      var calibration = readingProgress(target, target.calibratedFrom);
+      status.notes.push(['Rough estimate · ' + calibration.percent + '%', null, calibration.text +
+        (target.calibratedFrom > target.time ? '; firmer from around ' + formatDate(target.calibratedFrom) + '.' : '.')]);
     }
     return status;
   }
@@ -291,7 +310,7 @@
     var children = [
       line('',
         el('strong', { className: 'df-row-name', text: target.name }),
-        el('span', { className: 'df-row-when df-num ' + status.kind }, [status.icon ? icon(status.icon) : null, status.icon ? ' ' : null, status.text]))
+        el('span', { className: 'df-row-when df-num ' + status.kind, title: status.hint }, [status.icon ? icon(status.icon) : null, status.icon ? ' ' : null, status.text]))
     ];
 
     if (detailed) {
@@ -314,7 +333,10 @@
 
     if (detailed) {
       status.notes.forEach(function (note) {
-        children.push(el('div', { className: 'df-row-note' }, [note[0], note[1] ? el('strong', { className: 'df-num', text: note[1] }) : null]));
+        children.push(el('div', { className: 'df-row-note' }, [
+          note[2] ? el('span', { className: 'df-hint df-num', title: note[2], text: note[0] }) : note[0],
+          note[1] ? el('strong', { className: 'df-num', text: note[1] }) : null
+        ]));
       });
     }
 

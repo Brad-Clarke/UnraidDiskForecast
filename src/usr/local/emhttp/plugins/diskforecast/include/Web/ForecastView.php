@@ -53,6 +53,8 @@ final class ForecastView
             'time' => $latest?->time,
             'firstReading' => $result->firstReading,
             'readings' => $result->readings,
+            'forecastFrom' => $result->forecastFrom,
+            'calibratedFrom' => $result->calibratedFrom,
             'size' => $latest?->size,
             'used' => $latest?->used,
             'free' => $latest?->free,

@@ -54,6 +54,23 @@ final class Forecaster
     }
 
     /**
+     * History needed before the first forecast.
+     */
+    public function minimumSpanSeconds(): int
+    {
+        return $this->minimumSpanSeconds;
+    }
+
+    /**
+     * History needed before the range is calibrated on the target's own past, or null when
+     * this forecaster's range never is.
+     */
+    public function calibrationSeconds(): ?int
+    {
+        return $this->range instanceof HindcastRange ? $this->range->calibrationSeconds() : null;
+    }
+
+    /**
      * Forecasts the history as it stood at the given time (default: its newest reading).
      *
      * @param float $extraRoom Bytes of capacity to pretend were added now, for "what if I add a drive".

@@ -264,7 +264,8 @@
     };
 
     if (noForecast) {
-      box.replaceChildren(headline('Full in: N/A', 'There is no forecast yet: the first one comes after 7 days of readings.'));
+      var first = target.readings ? DF.rowStatus(target) : null;
+      box.replaceChildren(headline('Full in: N/A', first ? first.text + (first.date ? ', ' + first.date : '') + '.' : 'There are no readings yet.'));
       return;
     }
     if (times.secondsToFull === null) {
